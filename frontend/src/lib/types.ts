@@ -27,6 +27,7 @@ export interface ConversationResponse {
 export interface ConversationMessage {
   role: string;
   content: string;
+  sql?: string;
   display?: DisplayData;
 }
 
@@ -62,6 +63,7 @@ export interface ChatMessage {
   sql?: string;
   display?: DisplayData;
   isStreaming?: boolean;
+  hidden?: boolean;
 }
 
 export interface ToolStatus {

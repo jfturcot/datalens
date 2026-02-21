@@ -1,3 +1,4 @@
+import ReactMarkdown from "react-markdown";
 import type { ChatMessage, DisplayData } from "../../lib/types";
 import { SQLBlock } from "./SQLBlock";
 import { VizRenderer } from "../viz/VizRenderer";
@@ -19,12 +20,59 @@ export function MessageBubble({ message, onVizClick }: MessageBubbleProps) {
             : "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100"
         }`}
       >
-        <p className="whitespace-pre-wrap text-sm leading-relaxed">
-          {message.content}
+        <div className="text-sm leading-relaxed">
+          {isUser ? (
+            <p className="whitespace-pre-wrap">{message.content}</p>
+          ) : (
+            <ReactMarkdown
+              components={{
+                p: ({ children }) => (
+                  <p className="mb-2 last:mb-0 whitespace-pre-wrap">{children}</p>
+                ),
+                strong: ({ children }) => (
+                  <strong className="font-semibold">{children}</strong>
+                ),
+                em: ({ children }) => <em className="italic">{children}</em>,
+                ul: ({ children }) => (
+                  <ul className="mb-2 ml-4 list-disc space-y-1">{children}</ul>
+                ),
+                ol: ({ children }) => (
+                  <ol className="mb-2 ml-4 list-decimal space-y-1">{children}</ol>
+                ),
+                li: ({ children }) => <li>{children}</li>,
+                code: ({ className, children }) => {
+                  const isBlock = className?.includes("language-");
+                  return isBlock ? (
+                    <code className={className}>{children}</code>
+                  ) : (
+                    <code className="rounded bg-gray-200 px-1 py-0.5 text-xs dark:bg-gray-700">
+                      {children}
+                    </code>
+                  );
+                },
+                pre: ({ children }) => (
+                  <pre className="mb-2 overflow-x-auto rounded bg-gray-200 p-2 text-xs dark:bg-gray-700">
+                    {children}
+                  </pre>
+                ),
+                h1: ({ children }) => (
+                  <h1 className="mb-2 mt-3 text-lg font-bold">{children}</h1>
+                ),
+                h2: ({ children }) => (
+                  <h2 className="mb-1 mt-2 text-base font-bold">{children}</h2>
+                ),
+                h3: ({ children }) => (
+                  <h3 className="mb-1 mt-2 font-semibold">{children}</h3>
+                ),
+              }}
+            >
+              {message.content}
+            </ReactMarkdown>
+          )}
           {message.isStreaming && (
             <span className="ml-0.5 inline-block h-4 w-1 animate-pulse bg-current" />
           )}
-        </p>
+        </div>
 
         {!isUser && message.sql && <SQLBlock sql={message.sql} />}
 

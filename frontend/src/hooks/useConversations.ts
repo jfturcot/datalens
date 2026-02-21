@@ -40,28 +40,23 @@ export function useConversations(): UseConversationsReturn {
   const loadHistory = useCallback(async (id: string): Promise<ChatMessage[]> => {
     const detail = await getConversation(id);
     return detail.messages.map((m, i) => {
-      if (m.display) {
-        return {
-          id: `history-${i}`,
-          role: m.role as "user" | "assistant",
-          content: m.content,
-          display: m.display,
-        };
+      let display = m.display;
+      let content = m.content;
+      const sql = m.sql;
+
+      // Fallback: extract display from content if backend didn't provide it
+      if (!display && m.role === "assistant") {
+        const extracted = extractDisplay(content);
+        display = extracted.display ?? undefined;
+        content = extracted.cleanedContent;
       }
-      // Client-side fallback: extract display from content if backend didn't
-      if (m.role === "assistant") {
-        const { display, cleanedContent } = extractDisplay(m.content);
-        return {
-          id: `history-${i}`,
-          role: m.role as "user" | "assistant",
-          content: display ? cleanedContent : m.content,
-          display: display ?? undefined,
-        };
-      }
+
       return {
         id: `history-${i}`,
         role: m.role as "user" | "assistant",
-        content: m.content,
+        content,
+        sql,
+        display,
       };
     });
   }, []);

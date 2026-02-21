@@ -7,14 +7,12 @@ import { createSession, getMySession } from "./lib/api";
 import { useChat } from "./hooks/useChat";
 import { useFileUpload } from "./hooks/useFileUpload";
 import { useConversations } from "./hooks/useConversations";
-import type { ColumnInfo, DisplayData } from "./lib/types";
+import type { DisplayData } from "./lib/types";
 
 type AppState = "loading" | "no-file" | "chat";
 
-function formatGreeting(filename: string, columns: ColumnInfo[], rowCount: number): string {
-  const colList = columns.map((c) => `  - ${c.name} (${c.type})`).join("\n");
-  return `I've loaded **${filename}** — ${rowCount.toLocaleString()} rows with ${columns.length} columns:\n\n${colList}\n\nWhat would you like to know about this data?`;
-}
+const AUTO_GREETING_PROMPT =
+  "Describe this dataset briefly: what it contains, key columns, and suggest a few questions I could ask.";
 
 function App() {
   const [appState, setAppState] = useState<AppState>("loading");
@@ -84,22 +82,13 @@ function App() {
       await refresh();
       setActiveId(result.conversation_id);
       setShowDropZone(false);
-
-      const greeting = formatGreeting(
-        result.filename,
-        result.columns,
-        result.row_count,
-      );
-      setMessages([
-        {
-          id: `greeting-${Date.now()}`,
-          role: "assistant",
-          content: greeting,
-        },
-      ]);
+      setMessages([]);
       setAppState("chat");
+
+      // Auto-trigger LLM greeting (hidden user message so only the response shows)
+      submit(result.conversation_id, AUTO_GREETING_PROMPT, { hidden: true });
     },
-    [upload, refresh, setActiveId, setMessages],
+    [upload, refresh, setActiveId, setMessages, submit],
   );
 
   const handleNewConversation = useCallback(() => {
@@ -145,6 +134,12 @@ function App() {
     setVizDisplay(null);
   }, []);
 
+  const hasUserMessage = messages.some(
+    (m) => m.role === "user" && !m.hidden,
+  );
+  const showSuggestions =
+    appState === "chat" && !!activeId && !hasUserMessage && !isLoading;
+
   if (appState === "loading") {
     return (
       <div className="flex h-screen items-center justify-center bg-white dark:bg-gray-900">
@@ -181,6 +176,7 @@ function App() {
               onSubmit={handleSubmit}
               onStop={stop}
               onVizClick={handleVizClick}
+              showSuggestions={showSuggestions}
             />
           )}
         </div>

@@ -30,13 +30,14 @@ export function useChat(): UseChatReturn {
   }, []);
 
   const submit = useCallback(
-    (conversationId: string, content: string) => {
+    (conversationId: string, content: string, options?: { hidden?: boolean }) => {
       if (isLoading) return;
 
       const userMsg: ChatMessage = {
         id: genId(),
         role: "user",
         content,
+        hidden: options?.hidden,
       };
 
       const assistantId = genId();

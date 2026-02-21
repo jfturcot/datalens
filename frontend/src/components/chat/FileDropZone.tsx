@@ -121,6 +121,24 @@ export function FileDropZone({
           <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>
         )}
       </div>
+
+      {!uploading && (
+        <button
+          type="button"
+          onClick={async (e) => {
+            e.stopPropagation();
+            const res = await fetch("/sample_data.csv");
+            const blob = await res.blob();
+            const file = new File([blob], "sample_data.csv", {
+              type: "text/csv",
+            });
+            onFile(file);
+          }}
+          className="mt-4 text-sm text-blue-600 underline hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+        >
+          Or try with sample data
+        </button>
+      )}
     </div>
   );
 }
