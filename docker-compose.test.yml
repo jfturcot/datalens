@@ -32,8 +32,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-datalens}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-production}
       POSTGRES_DB: datalens_test
-    volumes:
-      - pgdata_test:/var/lib/postgresql/data
     ports:
       - "5433:5432"
     healthcheck:
@@ -48,12 +46,6 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-datalens}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-me-in-production}
-    volumes:
-      - miniodata_test:/data
     ports:
       - "9002:9000"
       - "9003:9001"
-
-volumes:
-  pgdata_test:
-  miniodata_test:
