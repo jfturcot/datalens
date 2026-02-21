@@ -50,21 +50,18 @@ export function StreamingStatus({
   // State 1: No content yet — bouncing dots
   if (!hasVisibleContent) {
     return (
-      <div className="flex flex-col gap-1 py-1">
-        <span className="inline-flex items-center gap-1">
-          {[0, 1, 2].map((i) => (
-            <span
-              key={i}
-              className="inline-block h-2 w-2 rounded-full bg-gray-400 dark:bg-gray-500"
-              style={{
-                animation: "bounce-dot 1.2s ease-in-out infinite",
-                animationDelay: `${i * 0.2}s`,
-              }}
-            />
-          ))}
-        </span>
-        {cancelButton}
-      </div>
+      <span className="inline-flex items-center gap-1 py-1">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="inline-block h-2 w-2 rounded-full bg-gray-400 dark:bg-gray-500"
+            style={{
+              animation: "bounce-dot 1.2s ease-in-out infinite",
+              animationDelay: `${i * 0.2}s`,
+            }}
+          />
+        ))}
+      </span>
     );
   }
 
