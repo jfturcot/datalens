@@ -33,7 +33,10 @@ visualized. Choose the display type based on the nature of the data:
    - List of records -> `{"type": "table"}`
 
    Always include the `data` array from the query results in the display \
-object.
+object. **Critical:** `x_axis`, `y_axis`, `label_key`, and `value_key` \
+must be exact column names from the `data` rows (e.g. `"industry_vertical"`, \
+not display labels like `"Industry"`). The frontend uses these as lookup \
+keys into each data row.
 
 5. **Be concise and clear.** Provide direct answers to the user's questions. \
 Include relevant numbers and context.

@@ -1,4 +1,6 @@
+import { useMemo } from "react";
 import type { DisplayData } from "../../lib/types";
+import { repairDisplay } from "../../lib/displayRepair";
 import { TextAnswer } from "./TextAnswer";
 import { DataTable } from "./DataTable";
 import { BarChartViz } from "./BarChartViz";
@@ -12,19 +14,21 @@ interface VizRendererProps {
 }
 
 export function VizRenderer({ display, compact }: VizRendererProps) {
-  switch (display.type) {
+  const repaired = useMemo(() => repairDisplay(display), [display]);
+
+  switch (repaired.type) {
     case "text":
-      return <TextAnswer display={display} />;
+      return <TextAnswer display={repaired} />;
     case "table":
-      return <DataTable display={display} compact={compact} />;
+      return <DataTable display={repaired} compact={compact} />;
     case "bar_chart":
-      return <BarChartViz display={display} compact={compact} />;
+      return <BarChartViz display={repaired} compact={compact} />;
     case "line_chart":
-      return <LineChartViz display={display} compact={compact} />;
+      return <LineChartViz display={repaired} compact={compact} />;
     case "pie_chart":
-      return <PieChartViz display={display} compact={compact} />;
+      return <PieChartViz display={repaired} compact={compact} />;
     case "scatter_plot":
-      return <ScatterPlotViz display={display} compact={compact} />;
+      return <ScatterPlotViz display={repaired} compact={compact} />;
     default:
       return null;
   }
