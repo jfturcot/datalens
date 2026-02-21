@@ -10,6 +10,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: ${{ secrets.DEPLOY_HOST != '' }}
     runs-on: ubuntu-latest
     environment: production
     steps:
