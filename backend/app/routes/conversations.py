@@ -169,7 +169,15 @@ async def send_message(
                     chunk = event.get("data", {}).get("chunk")
                     if chunk and hasattr(chunk, "content") and chunk.content:
                         content = chunk.content
-                        if isinstance(content, str):
+                        # Handle list-of-blocks format from Anthropic models
+                        if isinstance(content, list):
+                            content = "".join(
+                                b.get("text", "")
+                                if isinstance(b, dict)
+                                else str(b)
+                                for b in content
+                            )
+                        if isinstance(content, str) and content:
                             accumulated_content += content
                             yield {
                                 "event": "token",
@@ -204,6 +212,12 @@ async def send_message(
             last_display, cleaned_content = _extract_display_from_content(
                 accumulated_content
             )
+
+            if not cleaned_content.strip():
+                cleaned_content = (
+                    "I wasn't able to generate a complete response. "
+                    "Could you try rephrasing your question?"
+                )
 
             complete_data: dict[str, Any] = {"content": cleaned_content}
             if last_sql:
