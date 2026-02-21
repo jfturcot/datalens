@@ -10,7 +10,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from alembic import command
 from app.config import settings
 from app.models import engine
-from app.routes import health, sessions, upload
+from app.routes import conversations, health, sessions, upload
 
 logger = logging.getLogger(__name__)
 
@@ -72,3 +72,4 @@ app.add_middleware(
 app.include_router(health.router, prefix="/api")
 app.include_router(sessions.router, prefix="/api")
 app.include_router(upload.router, prefix="/api")
+app.include_router(conversations.router, prefix="/api")
