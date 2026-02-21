@@ -4,12 +4,12 @@ export default defineConfig({
   testDir: "./tests",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: "html",
-  timeout: 120_000,
+  reporter: process.env.CI ? "list" : "html",
+  timeout: 30_000,
   expect: {
-    timeout: 60_000,
+    timeout: 15_000,
   },
   use: {
     baseURL: "http://localhost:80",
