@@ -39,5 +39,13 @@ class Settings(BaseSettings):
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
 
+    @property
+    def psycopg_conninfo(self) -> str:
+        return (
+            f"host={self.postgres_host} port={self.postgres_port} "
+            f"dbname={self.postgres_db} user={self.postgres_user} "
+            f"password={self.postgres_password}"
+        )
+
 
 settings = Settings()

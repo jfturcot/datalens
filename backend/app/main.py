@@ -5,8 +5,10 @@ from contextlib import asynccontextmanager
 from alembic.config import Config
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from alembic import command
+from app.config import settings
 from app.models import engine
 from app.routes import health, sessions, upload
 
@@ -38,7 +40,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     run_migrations()
     logger.info("Database migrations applied")
     await enable_pg_duckdb()
-    yield
+
+    # Initialize LangGraph checkpoint saver
+    async with AsyncPostgresSaver.from_conn_string(
+        settings.sync_database_url
+    ) as checkpointer:
+        await checkpointer.setup()
+        logger.info("LangGraph checkpointer initialized")
+
+        # Create agent graph and store on app state
+        from app.agent.graph import create_agent_graph
+
+        app.state.agent_graph = create_agent_graph(checkpointer)
+        logger.info("Agent graph ready")
+
+        yield
     # Shutdown: dispose engine
     await engine.dispose()
 
