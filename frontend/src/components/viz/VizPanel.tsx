@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { DisplayData } from "../../lib/types";
 import { VizRenderer } from "./VizRenderer";
 
@@ -8,21 +8,33 @@ interface VizPanelProps {
 }
 
 const MIN_WIDTH = 360;
-const DEFAULT_WIDTH = 640;
-const MAX_WIDTH_RATIO = 0.75;
+const MAX_WIDTH_RATIO = 0.85;
 
 export function VizPanel({ display, onClose }: VizPanelProps) {
-  const [width, setWidth] = useState(DEFAULT_WIDTH);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState<number | null>(null);
   const dragging = useRef(false);
   const startX = useRef(0);
   const startWidth = useRef(0);
+
+  // Default to 2/3 of the parent container (the area right of sidebar)
+  useEffect(() => {
+    if (width !== null) return;
+    const parent = panelRef.current?.parentElement;
+    if (parent) {
+      const available = parent.getBoundingClientRect().width;
+      setWidth(Math.max(MIN_WIDTH, Math.round(available * (2 / 3))));
+    } else {
+      setWidth(Math.round(window.innerWidth * 0.55));
+    }
+  }, [width]);
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
       e.preventDefault();
       dragging.current = true;
       startX.current = e.clientX;
-      startWidth.current = width;
+      startWidth.current = width ?? 640;
 
       const onPointerMove = (ev: PointerEvent) => {
         if (!dragging.current) return;
@@ -45,8 +57,9 @@ export function VizPanel({ display, onClose }: VizPanelProps) {
 
   return (
     <div
+      ref={panelRef}
       className="relative flex h-full shrink-0 flex-col border-l border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
-      style={{ width }}
+      style={{ width: width ?? "66%" }}
     >
       {/* Drag handle */}
       <div
