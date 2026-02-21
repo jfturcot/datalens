@@ -10,11 +10,23 @@ concurrency:
 
 jobs:
   deploy:
-    if: ${{ secrets.DEPLOY_HOST != '' }}
     runs-on: ubuntu-latest
     environment: production
     steps:
+      - name: Check deployment config
+        id: config
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          if [ -z "$HOST" ]; then
+            echo "::notice::Deploy secrets not configured — skipping deployment"
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Deploy to Digital Ocean
+        if: steps.config.outputs.configured == 'true'
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -27,6 +39,7 @@ jobs:
             docker compose up -d
 
       - name: Health check
+        if: steps.config.outputs.configured == 'true'
         run: |
           for i in $(seq 1 30); do
             if curl -sf "http://${{ secrets.DEPLOY_HOST }}/api/health"; then
