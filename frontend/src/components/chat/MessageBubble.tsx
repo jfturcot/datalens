@@ -1,6 +1,5 @@
 import ReactMarkdown from "react-markdown";
 import type { ChatMessage, DisplayData } from "../../lib/types";
-import { SQLBlock } from "./SQLBlock";
 import { StreamingStatus } from "./StreamingStatus";
 import { VizRenderer } from "../viz/VizRenderer";
 
@@ -91,8 +90,6 @@ export function MessageBubble({ message, onVizClick, onStop }: MessageBubbleProp
             />
           )}
         </div>
-
-        {!isUser && message.sql && <SQLBlock sql={message.sql} />}
 
         {!isUser && message.display && (
           <div
