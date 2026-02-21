@@ -38,7 +38,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-datalens-dev}
       POSTGRES_DB: ${POSTGRES_DB:-datalens}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
       - shared-tmp:/tmp/datalens
     ports:
       - "5432:5432"

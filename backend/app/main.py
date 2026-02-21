@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -15,8 +16,8 @@ from app.routes import conversations, health, sessions, upload
 logger = logging.getLogger(__name__)
 
 
-def run_migrations() -> None:
-    """Run Alembic migrations to head on startup."""
+def _run_migrations_sync() -> None:
+    """Run Alembic migrations (sync, meant for thread execution)."""
     alembic_cfg = Config("alembic/alembic.ini")
     alembic_cfg.set_main_option("script_location", "alembic")
     command.upgrade(alembic_cfg, "head")
@@ -36,8 +37,8 @@ async def enable_pg_duckdb() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    # Startup: run migrations, then enable pg_duckdb
-    run_migrations()
+    # Startup: run migrations in thread (env.py uses asyncio.run internally)
+    await asyncio.to_thread(_run_migrations_sync)
     logger.info("Database migrations applied")
     await enable_pg_duckdb()
 
