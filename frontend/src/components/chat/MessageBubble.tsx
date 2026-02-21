@@ -9,15 +9,33 @@ interface MessageBubbleProps {
   onStop?: () => void;
 }
 
+const DISPLAY_TYPE_RE =
+  /"type"\s*:\s*"(?:text|table|bar_chart|line_chart|pie_chart|scatter_plot)"/;
+
 /**
- * Strip fenced code blocks from content so raw JSON display hints
- * don't flash in the bubble while streaming.
+ * Strip display-hint JSON from content so raw JSON doesn't flash in the
+ * bubble while streaming.  Handles both fenced (```json … ```) and bare
+ * JSON blocks the LLM may produce.
  */
-function stripCodeFences(text: string): string {
-  // Remove all complete fenced blocks: ```...```
+function stripDisplayHints(text: string): string {
+  // Remove complete fenced blocks: ```...```
   let result = text.replace(/```[\s\S]*?```/g, "");
   // Remove any trailing unclosed fence (still streaming)
   result = result.replace(/```[\s\S]*$/, "");
+
+  // Remove bare JSON visualization blocks (complete or still streaming).
+  // Walk backwards to find the last '{' that looks like a display hint.
+  const partialStartRe = /^\{\s*"(?:type|display)"\s*:/;
+  for (let i = result.length - 1; i >= 0; i--) {
+    if (result[i] === "{") {
+      const rest = result.substring(i);
+      if (DISPLAY_TYPE_RE.test(rest) || partialStartRe.test(rest)) {
+        result = result.substring(0, i);
+        break;
+      }
+    }
+  }
+
   return result.trim();
 }
 
@@ -79,13 +97,17 @@ export function MessageBubble({ message, onVizClick, onStop }: MessageBubbleProp
                 ),
               }}
             >
-              {stripCodeFences(message.content)}
+              {stripDisplayHints(message.content)}
             </ReactMarkdown>
           )}
           {message.isStreaming && (
             <StreamingStatus
-              hasVisibleContent={!!stripCodeFences(message.content)}
-              hasCodeFence={message.content.includes("```")}
+              hasVisibleContent={!!stripDisplayHints(message.content)}
+              hasCodeFence={
+                message.content.includes("```") ||
+                DISPLAY_TYPE_RE.test(message.content) ||
+                /\{\s*"(?:type|display)"\s*:/.test(message.content)
+              }
               onStop={onStop}
             />
           )}
