@@ -1,3 +1,4 @@
+import { useCallback, useRef, useState } from "react";
 import type { DisplayData } from "../../lib/types";
 import { VizRenderer } from "./VizRenderer";
 
@@ -6,9 +7,53 @@ interface VizPanelProps {
   onClose: () => void;
 }
 
+const MIN_WIDTH = 360;
+const DEFAULT_WIDTH = 640;
+const MAX_WIDTH_RATIO = 0.75;
+
 export function VizPanel({ display, onClose }: VizPanelProps) {
+  const [width, setWidth] = useState(DEFAULT_WIDTH);
+  const dragging = useRef(false);
+  const startX = useRef(0);
+  const startWidth = useRef(0);
+
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault();
+      dragging.current = true;
+      startX.current = e.clientX;
+      startWidth.current = width;
+
+      const onPointerMove = (ev: PointerEvent) => {
+        if (!dragging.current) return;
+        const delta = startX.current - ev.clientX;
+        const maxWidth = window.innerWidth * MAX_WIDTH_RATIO;
+        setWidth(Math.min(maxWidth, Math.max(MIN_WIDTH, startWidth.current + delta)));
+      };
+
+      const onPointerUp = () => {
+        dragging.current = false;
+        document.removeEventListener("pointermove", onPointerMove);
+        document.removeEventListener("pointerup", onPointerUp);
+      };
+
+      document.addEventListener("pointermove", onPointerMove);
+      document.addEventListener("pointerup", onPointerUp);
+    },
+    [width],
+  );
+
   return (
-    <div className="flex h-full w-[480px] shrink-0 flex-col border-l border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+    <div
+      className="relative flex h-full shrink-0 flex-col border-l border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+      style={{ width }}
+    >
+      {/* Drag handle */}
+      <div
+        onPointerDown={onPointerDown}
+        className="absolute left-0 top-0 z-10 h-full w-1.5 cursor-col-resize hover:bg-blue-400/40 active:bg-blue-500/50"
+      />
+
       <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
         <h3 className="text-sm font-medium text-gray-800 dark:text-gray-200">
           {display.title ?? "Visualization"}
