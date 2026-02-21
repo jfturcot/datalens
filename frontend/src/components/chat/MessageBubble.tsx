@@ -81,10 +81,26 @@ export function MessageBubble({ message, onVizClick }: MessageBubbleProps) {
               {stripCodeFences(message.content)}
             </ReactMarkdown>
           )}
-          {message.isStreaming &&
-            (stripCodeFences(message.content) ? (
-              <span className="ml-0.5 inline-block h-4 w-0.5 animate-blink bg-current" />
-            ) : (
+          {message.isStreaming && (() => {
+            const visible = stripCodeFences(message.content);
+            const hasCodeFence = message.content.includes("```");
+            if (visible) {
+              return (
+                <>
+                  <span className="ml-0.5 inline-block h-4 w-0.5 animate-blink bg-current" />
+                  {hasCodeFence && (
+                    <p className="mt-2 flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+                      <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Building visualization...
+                    </p>
+                  )}
+                </>
+              );
+            }
+            return (
               <span className="inline-flex items-center gap-1 py-1">
                 {[0, 1, 2].map((i) => (
                   <span
@@ -97,7 +113,8 @@ export function MessageBubble({ message, onVizClick }: MessageBubbleProps) {
                   />
                 ))}
               </span>
-            ))}
+            );
+          })()}
         </div>
 
         {!isUser && message.sql && <SQLBlock sql={message.sql} />}
