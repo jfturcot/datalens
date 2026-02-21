@@ -897,3 +897,69 @@ This file will live at the repo root and govern all AI agent behavior:
 - Environment secrets must NEVER be committed. Use .env.
 - All async code must use async/await (no sync blocking in async context).
 ```
+
+## 16. Implementation Notes
+
+This spec was written before any code. The following documents what changed
+during implementation — included to show the delta between plan and execution.
+
+### 16.1 Structural Deviations
+
+The backend service layer was reorganized slightly:
+
+| Spec Planned             | Actual                    | Reason                                          |
+|--------------------------|---------------------------|-------------------------------------------------|
+| `csv_service.py`         | `upload_service.py`       | CSV validation is tightly coupled to upload flow |
+| `storage_service.py`     | `minio_service.py`        | More descriptive name                            |
+| `agent/streaming.py`     | Inline in `conversations.py` | SSE logic was small enough to keep co-located |
+
+The frontend gained a few files not in the original plan:
+
+- `StreamingStatus.tsx` — progress indicator during visualization streaming
+  (bouncing dots → "Building visualization..." → blinking cursor)
+- `VizRenderer.tsx` — dispatcher that routes `display.type` to the correct chart
+  component
+- `displayExtractor.ts` — client-side fallback to extract display JSON from
+  message content (used when loading conversation history)
+- `displayRepair.ts` — heuristic repair for malformed LLM JSON output
+
+### 16.2 Behavioral Changes
+
+**Conversation creation** — The spec lists `POST /api/conversations` as a
+separate endpoint. In practice, conversation creation is a side effect of
+`POST /api/upload` — uploading a file creates both the data table and the
+conversation in one step. A standalone endpoint was unnecessary since every
+conversation requires a dataset.
+
+**Auto-greeting** — The spec says "the agent sends a greeting message" after
+upload. The actual implementation has the frontend submit a hidden message
+(`"Describe this dataset briefly..."`) immediately after upload, so the greeting
+is an LLM-generated response rather than a hardcoded backend message. This
+produces richer, dataset-aware greetings.
+
+**Chat input before upload** — Section 3.1 contradicts itself: point 4 says the
+input is "disabled" while point 5 says "if the user types before uploading, the
+agent responds..." The implementation chose disabled — the input is physically
+inert until a file is uploaded.
+
+### 16.3 Production Additions
+
+These were not in the original spec but were added during deployment:
+
+- **`docker-compose.prod.yml`** — production compose file with SSL support
+  (port 443, Let's Encrypt certificate mounts, nginx SSL config)
+- **`nginx-ssl.conf`** — HTTPS termination with HTTP→HTTPS redirect, needed
+  because Cloudflare is configured in Full/Strict mode for `solution30.com`
+- **`shared-tmp` volume** — shared `/tmp/datalens` mount between the API and
+  postgres containers, required because `read_csv()` runs inside pg_duckdb but
+  the temp file is written by the API container
+- **`.dockerignore`** — prevents root-owned cache directories (`.ruff_cache`)
+  from breaking Docker builds
+
+### 16.4 Deployment Corrections
+
+| Spec (Section 13)                    | Actual                                         |
+|--------------------------------------|-------------------------------------------------|
+| "8GB RAM"                            | s-2vcpu-4gb (4GB, sufficient for the workload)  |
+| "Cloudflare handles TLS termination" | Let's Encrypt on droplet, Cloudflare Full/Strict|
+| "Domain: TBD"                        | `datalens.solution30.com`                        |
