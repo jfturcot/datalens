@@ -35,8 +35,8 @@ jobs:
           script: |
             cd /opt/datalens
             git pull origin main
-            docker compose build
-            docker compose up -d
+            docker compose -f docker-compose.prod.yml build
+            docker compose -f docker-compose.prod.yml up -d
 
       - name: Health check
         if: steps.config.outputs.configured == 'true'
