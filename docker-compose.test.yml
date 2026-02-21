@@ -27,6 +27,7 @@ services:
 
   postgres:
     image: pgduckdb/pgduckdb:18-v1.1.1
+    shm_size: 256m
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-datalens}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-production}

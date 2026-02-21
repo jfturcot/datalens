@@ -1,6 +1,6 @@
 import io
 
-from miniopy_async import Minio
+from miniopy_async import Minio  # type: ignore[attr-defined]
 
 from app.config import settings
 

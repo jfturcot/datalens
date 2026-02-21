@@ -16,7 +16,7 @@ def create_llm() -> ChatOpenAI:
     base_url = settings.litellm_api_url.rstrip("/") + "/v1"
     return ChatOpenAI(
         base_url=base_url,
-        api_key=settings.litellm_api_key,
+        api_key=settings.litellm_api_key,  # type: ignore[arg-type]
         model=settings.litellm_model,
     )
 

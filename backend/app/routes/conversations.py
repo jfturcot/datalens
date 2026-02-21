@@ -15,6 +15,7 @@ from app.models.schemas import (
     ConversationDetailResponse,
     ConversationMessage,
     ConversationResponse,
+    DisplayData,
     MessageRequest,
 )
 from app.models.session import Session
@@ -97,15 +98,20 @@ async def get_conversation(
                     msg.content if isinstance(msg.content, str) else str(msg.content)
                 )
                 if content:
-                    display = None
+                    display_data: DisplayData | None = None
                     sql = None
                     if role == "assistant":
-                        display, content = _extract_display_from_content(content)
+                        raw_display, content = _extract_display_from_content(content)
+                        if raw_display:
+                            try:
+                                display_data = DisplayData(**raw_display)
+                            except Exception:
+                                display_data = None
                         sql = last_sql
                         last_sql = None
                     messages.append(
                         ConversationMessage(
-                            role=role, content=content, sql=sql, display=display
+                            role=role, content=content, sql=sql, display=display_data
                         )
                     )
     except Exception:

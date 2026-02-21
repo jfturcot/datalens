@@ -158,6 +158,9 @@ jobs:
             'MINIO_ENDPOINT=minio:9000' \
             'APP_ENV=test' \
             'SESSION_SECRET=ci-test-secret' \
+            "LITELLM_API_KEY=${{ secrets.LITELLM_API_KEY }}" \
+            "LITELLM_API_URL=${{ secrets.LITELLM_API_URL }}" \
+            "LITELLM_MODEL=${LITELLM_MODEL:-claude-sonnet-4-5}" \
             > .env
 
       - name: Start services
