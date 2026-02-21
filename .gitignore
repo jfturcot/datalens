@@ -1,0 +1,39 @@
+# Gas Town runtime
+.runtime/
+.claude/commands/
+.logs/
+
+# Environment
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+frontend/dist/
+e2e/test-results/
+e2e/playwright-report/
+
+# Docker
+pgdata/
+miniodata/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
