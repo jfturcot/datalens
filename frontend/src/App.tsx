@@ -20,6 +20,7 @@ function App() {
   const [showDropZone, setShowDropZone] = useState(false);
   const [vizDisplay, setVizDisplay] = useState<DisplayData | null>(null);
   const initRef = useRef(false);
+  const skipHistoryRef = useRef(false);
 
   const { messages, toolStatus, isLoading, submit, stop, setMessages } =
     useChat();
@@ -64,6 +65,10 @@ function App() {
   // Load history when active conversation changes
   useEffect(() => {
     if (!activeId) return;
+    if (skipHistoryRef.current) {
+      skipHistoryRef.current = false;
+      return;
+    }
     (async () => {
       const history = await loadHistory(activeId);
       setMessages(history);
@@ -80,6 +85,7 @@ function App() {
     async (file: File) => {
       const result = await upload(file);
       await refresh();
+      skipHistoryRef.current = true;
       setActiveId(result.conversation_id);
       setShowDropZone(false);
       setMessages([]);
