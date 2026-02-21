@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     # App
     app_env: str = "development"
     session_secret: str = "dev-secret-not-for-production"
+    access_password: str = ""  # empty = no password required
 
     @property
     def database_url(self) -> str:

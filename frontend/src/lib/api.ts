@@ -19,8 +19,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export async function createSession(): Promise<SessionResponse> {
-  return request<SessionResponse>("/sessions", { method: "POST" });
+export async function createSession(password?: string): Promise<SessionResponse> {
+  return request<SessionResponse>("/sessions", {
+    method: "POST",
+    headers: password ? { "Content-Type": "application/json" } : undefined,
+    body: password ? JSON.stringify({ password }) : undefined,
+  });
 }
 
 export async function getMySession(): Promise<SessionResponse> {

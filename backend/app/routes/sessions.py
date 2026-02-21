@@ -1,13 +1,13 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.dependencies import get_current_session
 from app.models import get_db
-from app.models.schemas import SessionResponse
+from app.models.schemas import SessionRequest, SessionResponse
 from app.models.session import Session
 from app.services.session_service import create_session
 
@@ -17,8 +17,13 @@ router = APIRouter()
 @router.post("/sessions", response_model=SessionResponse)
 async def create_new_session(
     db: Annotated[AsyncSession, Depends(get_db)],
+    body: SessionRequest | None = None,
 ) -> JSONResponse:
     """Create a new session and set the session cookie."""
+    if settings.access_password:
+        password = body.password if body else None
+        if password != settings.access_password:
+            raise HTTPException(status_code=401, detail="Invalid password")
     session = await create_session(db)
     response = JSONResponse(
         content=SessionResponse.model_validate(session).model_dump(mode="json")

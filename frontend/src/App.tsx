@@ -3,13 +3,14 @@ import { Layout } from "./components/layout/Layout";
 import { FileDropZone } from "./components/chat/FileDropZone";
 import { ChatWindow } from "./components/chat/ChatWindow";
 import { VizPanel } from "./components/viz/VizPanel";
+import { PasswordGate } from "./components/PasswordGate";
 import { createSession, getMySession } from "./lib/api";
 import { useChat } from "./hooks/useChat";
 import { useFileUpload } from "./hooks/useFileUpload";
 import { useConversations } from "./hooks/useConversations";
 import type { DisplayData } from "./lib/types";
 
-type AppState = "loading" | "no-file" | "chat";
+type AppState = "loading" | "needs-password" | "no-file" | "chat";
 
 const AUTO_GREETING_PROMPT =
   "Describe this dataset briefly: what it contains, key columns, and suggest a few questions I could ask.";
@@ -44,7 +45,15 @@ function App() {
       try {
         await getMySession();
       } catch {
-        await createSession();
+        try {
+          await createSession();
+        } catch (err) {
+          if (err instanceof Error && err.message.startsWith("401")) {
+            setAppState("needs-password");
+            return;
+          }
+          throw err;
+        }
       }
       setSessionReady(true);
       await refresh();
@@ -143,11 +152,21 @@ function App() {
     setVizSql(null);
   }, []);
 
+  const handleAuthenticated = useCallback(async () => {
+    setSessionReady(true);
+    await refresh();
+    setAppState("loading");
+  }, [refresh]);
+
   const hasUserMessage = messages.some(
     (m) => m.role === "user" && !m.hidden,
   );
   const showSuggestions =
     appState === "chat" && !!activeId && !hasUserMessage && !isLoading;
+
+  if (appState === "needs-password") {
+    return <PasswordGate onAuthenticated={handleAuthenticated} />;
+  }
 
   if (appState === "loading") {
     return (

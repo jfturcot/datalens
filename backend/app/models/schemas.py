@@ -5,6 +5,10 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
+class SessionRequest(BaseModel):
+    password: str | None = None
+
+
 class SessionResponse(BaseModel):
     id: uuid.UUID
     created_at: datetime
