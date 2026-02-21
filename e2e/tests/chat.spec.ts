@@ -17,9 +17,8 @@ async function uploadAndWaitForGreeting(page: import("@playwright/test").Page) {
   const fileInput = page.locator('input[type="file"]');
   await fileInput.setInputFiles(CSV_PATH);
 
-  // Wait for the mocked auto-greeting to appear
-  const assistantMessage = page.locator('[class*="bg-gray-100"]').first();
-  await expect(assistantMessage).toBeVisible({ timeout: 30_000 });
+  // Wait for the mocked auto-greeting content to appear
+  await expect(page.getByText("20 rows")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByPlaceholder("Ask about your data...")).toBeEnabled();
 }
 

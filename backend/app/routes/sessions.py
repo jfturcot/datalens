@@ -28,7 +28,7 @@ async def create_new_session(
         value=str(session.id),
         httponly=True,
         samesite="lax",
-        secure=settings.app_env != "development",
+        secure=settings.app_env == "production",
     )
     return response
 
