@@ -1,12 +1,14 @@
 import { test, expect } from "@playwright/test";
 import path from "path";
+import { mockLLMResponses } from "../fixtures/mock-sse";
 
 const CSV_PATH = path.join(__dirname, "..", "fixtures", "sample_data.csv");
 
 /**
- * Helper: upload CSV and wait for the schema greeting.
+ * Helper: upload CSV and wait for the auto-greeting.
  */
 async function uploadAndWaitForGreeting(page: import("@playwright/test").Page) {
+  await mockLLMResponses(page);
   await page.goto("/");
   await expect(
     page.getByText("Drop a CSV file here or click to browse")
@@ -15,7 +17,9 @@ async function uploadAndWaitForGreeting(page: import("@playwright/test").Page) {
   const fileInput = page.locator('input[type="file"]');
   await fileInput.setInputFiles(CSV_PATH);
 
-  await expect(page.getByText("I've loaded")).toBeVisible({ timeout: 30_000 });
+  // Wait for the mocked auto-greeting
+  const assistantMessage = page.locator('[class*="bg-gray-100"]').first();
+  await expect(assistantMessage).toBeVisible({ timeout: 30_000 });
   await expect(page.getByPlaceholder("Ask about your data...")).toBeEnabled();
 }
 
@@ -29,10 +33,10 @@ async function sendMessage(page: import("@playwright/test").Page, text: string) 
 
   // Wait for streaming to finish (Send button reappears)
   await expect(page.getByRole("button", { name: "Send" })).toBeVisible({
-    timeout: 90_000,
+    timeout: 30_000,
   });
 
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(500);
 }
 
 test.describe("Visualization", () => {
@@ -43,14 +47,13 @@ test.describe("Visualization", () => {
   test("ask question that triggers bar chart and verify chart renders", async ({
     page,
   }) => {
-    // This question should trigger a bar_chart visualization comparing categories
+    // This question triggers the bar_chart mock response
     await sendMessage(
       page,
       "Show me the average ARR by industry vertical as a bar chart"
     );
 
     // Recharts renders SVG elements with .recharts-bar-rectangle rect elements
-    // Wait for a Recharts bar chart to appear in the page
     const chartContainer = page.locator(".recharts-responsive-container");
     await expect(chartContainer.first()).toBeVisible({ timeout: 10_000 });
 
@@ -74,15 +77,11 @@ test.describe("Visualization", () => {
     await expect(expandButton.first()).toBeVisible();
     await expandButton.first().click();
 
-    // The VizPanel should now be visible — it's a 480px wide panel with a close button
+    // The VizPanel should now be visible with a close button
     const closeButton = page.locator('[aria-label="Close panel"]');
     await expect(closeButton).toBeVisible();
 
-    // The panel should contain a larger Recharts visualization
-    const panelChart = page.locator(
-      '[aria-label="Close panel"] >> xpath=../../.. >> .recharts-responsive-container'
-    );
-    // Alternative: just check there are now multiple recharts containers (inline + panel)
+    // Should have multiple recharts containers (inline + panel)
     const allCharts = page.locator(".recharts-responsive-container");
     expect(await allCharts.count()).toBeGreaterThanOrEqual(2);
   });

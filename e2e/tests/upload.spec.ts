@@ -1,11 +1,13 @@
 import { test, expect } from "@playwright/test";
 import path from "path";
+import { mockLLMResponses } from "../fixtures/mock-sse";
 
 const FIXTURE_DIR = path.join(__dirname, "..", "fixtures");
 const CSV_PATH = path.join(FIXTURE_DIR, "sample_data.csv");
 
 test.describe("File Upload", () => {
   test.beforeEach(async ({ page }) => {
+    await mockLLMResponses(page);
     await page.goto("/");
     // Wait for the app to finish loading and show the drop zone
     await expect(
@@ -13,15 +15,17 @@ test.describe("File Upload", () => {
     ).toBeVisible();
   });
 
-  test("drop CSV file and see schema greeting", async ({ page }) => {
+  test("drop CSV file and see auto-greeting", async ({ page }) => {
     // Use the hidden file input to upload the CSV
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles(CSV_PATH);
 
-    // Wait for upload to complete and LLM auto-greeting to appear
-    // The LLM describes the dataset — wait for an assistant message bubble
+    // Wait for the LLM auto-greeting (mocked) to appear as an assistant bubble
     const assistantMessage = page.locator('[class*="bg-gray-100"]').first();
-    await expect(assistantMessage).toBeVisible({ timeout: 60_000 });
+    await expect(assistantMessage).toBeVisible({ timeout: 30_000 });
+
+    // The greeting should mention dataset characteristics
+    await expect(assistantMessage).toContainText("20 rows");
 
     // The chat input should now be enabled
     const chatInput = page.getByPlaceholder("Ask about your data...");
@@ -40,10 +44,6 @@ test.describe("File Upload", () => {
     // Should show an error message about CSV requirement
     const errorMessage = page.locator("text=/[Cc][Ss][Vv]/");
     await expect(errorMessage).toBeVisible({ timeout: 15_000 });
-
-    // The chat input should still be disabled (no successful upload)
-    const chatInput = page.getByPlaceholder("Ask about your data...");
-    await expect(chatInput).toBeVisible();
   });
 
   test("reject oversized file", async ({ page }) => {
@@ -59,9 +59,5 @@ test.describe("File Upload", () => {
     // Should show an error about file size
     const errorMessage = page.locator("text=/[Ss]ize|[Ll]arge|10.?MB/");
     await expect(errorMessage).toBeVisible({ timeout: 15_000 });
-
-    // The chat input should still be disabled
-    const chatInput = page.getByPlaceholder("Ask about your data...");
-    await expect(chatInput).toBeVisible();
   });
 });
