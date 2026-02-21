@@ -252,6 +252,23 @@ _DISPLAY_TYPES = frozenset(
 )
 
 
+def _unwrap_display(parsed: dict[str, Any]) -> dict[str, Any] | None:
+    """Check if parsed JSON is a display hint, unwrapping envelope if needed.
+
+    Handles both direct ``{"type": "bar_chart", ...}`` and wrapped
+    ``{"display": {"type": "bar_chart", ...}}`` formats.
+    """
+    if not isinstance(parsed, dict):
+        return None
+    if parsed.get("type") in _DISPLAY_TYPES:
+        return parsed
+    # Unwrap {"display": {...}} envelope
+    inner = parsed.get("display")
+    if isinstance(inner, dict) and inner.get("type") in _DISPLAY_TYPES:
+        return inner
+    return None
+
+
 def _find_brace_balanced_json(text: str, start: int) -> str | None:
     """Extract a brace-balanced JSON substring starting at ``text[start]``.
 
@@ -308,7 +325,8 @@ def _extract_display_from_content(
             parsed = json.loads(blob)
         except json.JSONDecodeError:
             continue
-        if isinstance(parsed, dict) and parsed.get("type") in _DISPLAY_TYPES:
+        display = _unwrap_display(parsed)
+        if display is not None:
             # Remove the entire fenced block (``` ... ```)
             block_end = content.find("```", brace_start + len(blob))
             if block_end != -1:
@@ -316,7 +334,7 @@ def _extract_display_from_content(
             else:
                 fence_end = brace_start + len(blob)
             cleaned = content[: m.start()] + content[fence_end:]
-            return parsed, cleaned.strip()
+            return display, cleaned.strip()
 
     # Strategy 2: bare JSON object with a display type key
     for i in range(len(content)):
@@ -329,8 +347,9 @@ def _extract_display_from_content(
             parsed = json.loads(blob)
         except json.JSONDecodeError:
             continue
-        if isinstance(parsed, dict) and parsed.get("type") in _DISPLAY_TYPES:
+        display = _unwrap_display(parsed)
+        if display is not None:
             cleaned = content[:i] + content[i + len(blob) :]
-            return parsed, cleaned.strip()
+            return display, cleaned.strip()
 
     return None, content

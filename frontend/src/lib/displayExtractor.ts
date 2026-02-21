@@ -43,6 +43,22 @@ function findBraceBalancedJson(text: string, start: number): string | null {
 }
 
 /**
+ * Check if parsed JSON is a display hint, unwrapping {"display": {...}} envelope.
+ */
+function unwrapDisplay(parsed: unknown): DisplayData | null {
+  if (!parsed || typeof parsed !== "object") return null;
+  const obj = parsed as Record<string, unknown>;
+  if (DISPLAY_TYPES.has(obj.type as string)) return obj as unknown as DisplayData;
+  // Unwrap {"display": {...}} envelope
+  const inner = obj.display;
+  if (inner && typeof inner === "object") {
+    const innerObj = inner as Record<string, unknown>;
+    if (DISPLAY_TYPES.has(innerObj.type as string)) return inner as unknown as DisplayData;
+  }
+  return null;
+}
+
+/**
  * Client-side fallback: extract a display-hint JSON from message content.
  * Returns `{ display, cleanedContent }` where cleanedContent has the JSON
  * block stripped out.
@@ -59,17 +75,12 @@ export function extractDisplay(content: string): {
     const blob = findBraceBalancedJson(content, braceStart);
     if (!blob) continue;
     try {
-      const parsed: unknown = JSON.parse(blob);
-      if (
-        parsed &&
-        typeof parsed === "object" &&
-        "type" in parsed &&
-        DISPLAY_TYPES.has((parsed as Record<string, unknown>).type as string)
-      ) {
+      const display = unwrapDisplay(JSON.parse(blob));
+      if (display) {
         const blockEnd = content.indexOf("```", braceStart + blob.length);
         const fenceEnd = blockEnd !== -1 ? blockEnd + 3 : braceStart + blob.length;
         const cleaned = (content.slice(0, m.index) + content.slice(fenceEnd)).trim();
-        return { display: parsed as DisplayData, cleanedContent: cleaned };
+        return { display, cleanedContent: cleaned };
       }
     } catch {
       continue;
@@ -82,15 +93,10 @@ export function extractDisplay(content: string): {
     const blob = findBraceBalancedJson(content, i);
     if (!blob) continue;
     try {
-      const parsed: unknown = JSON.parse(blob);
-      if (
-        parsed &&
-        typeof parsed === "object" &&
-        "type" in parsed &&
-        DISPLAY_TYPES.has((parsed as Record<string, unknown>).type as string)
-      ) {
+      const display = unwrapDisplay(JSON.parse(blob));
+      if (display) {
         const cleaned = (content.slice(0, i) + content.slice(i + blob.length)).trim();
-        return { display: parsed as DisplayData, cleanedContent: cleaned };
+        return { display, cleanedContent: cleaned };
       }
     } catch {
       continue;
