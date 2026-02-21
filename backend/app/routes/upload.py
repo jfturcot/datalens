@@ -69,6 +69,7 @@ async def upload_csv(
         # --- Create table via pg_duckdb ---
         table_name = generate_table_name(session.id, file.filename)
 
+        await db.execute(text(f"DROP TABLE IF EXISTS {table_name}"))
         create_sql = text(
             f"CREATE TABLE {table_name} AS SELECT * FROM read_csv('{tmp_path}')"
         )
