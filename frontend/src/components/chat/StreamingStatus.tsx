@@ -69,7 +69,7 @@ export function StreamingStatus({
   if (hasCodeFence) {
     const message =
       [...PROGRESS_MESSAGES].reverse().find((m) => elapsed >= m.after)?.text ??
-      PROGRESS_MESSAGES[0].text;
+      "Building visualization...";
 
     return (
       <>

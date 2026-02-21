@@ -76,6 +76,7 @@ async def get_conversation(
     try:
         state = await graph.aget_state(config)
         if state and state.values and "messages" in state.values:
+            last_sql: str | None = None
             for msg in state.values["messages"]:
                 role = getattr(msg, "type", "unknown")
                 # Map LangGraph message types to simple roles
@@ -83,6 +84,12 @@ async def get_conversation(
                     role = "user"
                 elif role in ("ai", "AIMessage"):
                     role = "assistant"
+                    # Track SQL from execute_query tool calls
+                    for tc in getattr(msg, "tool_calls", []):
+                        if tc.get("name") == "execute_query":
+                            sql = tc.get("args", {}).get("sql")
+                            if sql:
+                                last_sql = sql
                 elif role == "tool":
                     continue  # Skip tool messages in the history
 
@@ -91,11 +98,14 @@ async def get_conversation(
                 )
                 if content:
                     display = None
+                    sql = None
                     if role == "assistant":
                         display, content = _extract_display_from_content(content)
+                        sql = last_sql
+                        last_sql = None
                     messages.append(
                         ConversationMessage(
-                            role=role, content=content, display=display
+                            role=role, content=content, sql=sql, display=display
                         )
                     )
     except Exception:

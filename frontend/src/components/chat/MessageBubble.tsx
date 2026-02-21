@@ -6,7 +6,7 @@ import { VizRenderer } from "../viz/VizRenderer";
 
 interface MessageBubbleProps {
   message: ChatMessage;
-  onVizClick?: (display: DisplayData) => void;
+  onVizClick?: (display: DisplayData, sql?: string) => void;
   onStop?: () => void;
 }
 
@@ -97,13 +97,13 @@ export function MessageBubble({ message, onVizClick, onStop }: MessageBubbleProp
         {!isUser && message.display && (
           <div
             className="mt-3 cursor-pointer rounded-lg border border-gray-200 bg-white p-3 transition-shadow hover:shadow-md dark:border-gray-600 dark:bg-gray-900"
-            onClick={() => onVizClick?.(message.display!)}
+            onClick={() => onVizClick?.(message.display!, message.sql)}
             role="button"
             tabIndex={0}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
-                onVizClick?.(message.display!);
+                onVizClick?.(message.display!, message.sql);
               }
             }}
             aria-label="Click to expand visualization"

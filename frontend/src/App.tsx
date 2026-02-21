@@ -19,6 +19,7 @@ function App() {
   const [sessionReady, setSessionReady] = useState(false);
   const [showDropZone, setShowDropZone] = useState(false);
   const [vizDisplay, setVizDisplay] = useState<DisplayData | null>(null);
+  const [vizSql, setVizSql] = useState<string | null>(null);
   const initRef = useRef(false);
   const skipHistoryRef = useRef(false);
 
@@ -132,12 +133,14 @@ function App() {
     [activeId, submit],
   );
 
-  const handleVizClick = useCallback((display: DisplayData) => {
+  const handleVizClick = useCallback((display: DisplayData, sql?: string) => {
     setVizDisplay(display);
+    setVizSql(sql ?? null);
   }, []);
 
   const handleVizClose = useCallback(() => {
     setVizDisplay(null);
+    setVizSql(null);
   }, []);
 
   const hasUserMessage = messages.some(
@@ -187,7 +190,7 @@ function App() {
           )}
         </div>
         {vizDisplay && (
-          <VizPanel display={vizDisplay} onClose={handleVizClose} />
+          <VizPanel display={vizDisplay} sql={vizSql} onClose={handleVizClose} />
         )}
       </div>
     </Layout>

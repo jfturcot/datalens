@@ -12,7 +12,7 @@ interface ChatWindowProps {
   inputDisabled: boolean;
   onSubmit: (content: string) => void;
   onStop: () => void;
-  onVizClick?: (display: DisplayData) => void;
+  onVizClick?: (display: DisplayData, sql?: string) => void;
   showSuggestions?: boolean;
 }
 

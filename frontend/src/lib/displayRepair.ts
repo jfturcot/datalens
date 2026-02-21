@@ -8,7 +8,9 @@ import type { DisplayData } from "./types";
 export function repairDisplay(display: DisplayData): DisplayData {
   if (!display.data || display.data.length === 0) return display;
 
-  const keys = Object.keys(display.data[0]);
+  const first = display.data[0];
+  if (!first) return display;
+  const keys = Object.keys(first);
   if (keys.length === 0) return display;
 
   const repaired = { ...display };
@@ -37,7 +39,7 @@ export function repairDisplay(display: DisplayData): DisplayData {
 function resolveKey(
   given: string | undefined,
   keys: string[],
-  preferType: "string" | "number",
+  _preferType: "string" | "number",
 ): string | undefined {
   if (!given) return given;
 

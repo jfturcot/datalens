@@ -11,7 +11,7 @@ interface UseChatReturn {
   messages: ChatMessage[];
   toolStatus: ToolStatus | null;
   isLoading: boolean;
-  submit: (conversationId: string, content: string) => void;
+  submit: (conversationId: string, content: string, options?: { hidden?: boolean }) => void;
   stop: () => void;
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
 }

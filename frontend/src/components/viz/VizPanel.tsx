@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DisplayData } from "../../lib/types";
+import { SQLBlock } from "../chat/SQLBlock";
 import { VizRenderer } from "./VizRenderer";
 
 interface VizPanelProps {
   display: DisplayData;
+  sql?: string | null;
   onClose: () => void;
 }
 
 const MIN_WIDTH = 360;
 const MAX_WIDTH_RATIO = 0.85;
 
-export function VizPanel({ display, onClose }: VizPanelProps) {
+export function VizPanel({ display, sql, onClose }: VizPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState<number | null>(null);
   const dragging = useRef(false);
@@ -92,6 +94,7 @@ export function VizPanel({ display, onClose }: VizPanelProps) {
       </div>
       <div className="flex-1 overflow-auto p-4">
         <VizRenderer display={display} />
+        {sql && <SQLBlock sql={sql} />}
       </div>
     </div>
   );
