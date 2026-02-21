@@ -81,9 +81,23 @@ export function MessageBubble({ message, onVizClick }: MessageBubbleProps) {
               {stripCodeFences(message.content)}
             </ReactMarkdown>
           )}
-          {message.isStreaming && (
-            <span className="ml-0.5 inline-block h-4 w-1 animate-pulse bg-current" />
-          )}
+          {message.isStreaming &&
+            (stripCodeFences(message.content) ? (
+              <span className="ml-0.5 inline-block h-4 w-0.5 animate-blink bg-current" />
+            ) : (
+              <span className="inline-flex items-center gap-1 py-1">
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    className="inline-block h-2 w-2 rounded-full bg-gray-400 dark:bg-gray-500"
+                    style={{
+                      animation: "bounce-dot 1.2s ease-in-out infinite",
+                      animationDelay: `${i * 0.2}s`,
+                    }}
+                  />
+                ))}
+              </span>
+            ))}
         </div>
 
         {!isUser && message.sql && <SQLBlock sql={message.sql} />}
