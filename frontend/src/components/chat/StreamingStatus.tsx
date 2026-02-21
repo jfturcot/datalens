@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 interface StreamingStatusProps {
   hasVisibleContent: boolean;
   hasCodeFence: boolean;
+  onStop?: () => void;
 }
 
 const PROGRESS_MESSAGES = [
@@ -22,33 +23,48 @@ function formatElapsed(seconds: number): string {
 export function StreamingStatus({
   hasVisibleContent,
   hasCodeFence,
+  onStop,
 }: StreamingStatusProps) {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
-    if (!hasCodeFence) {
-      setElapsed(0);
-      return;
-    }
     const id = setInterval(() => setElapsed((e) => e + 1), 1000);
     return () => clearInterval(id);
+  }, []);
+
+  // Reset when code fence phase starts
+  useEffect(() => {
+    if (hasCodeFence) setElapsed(0);
   }, [hasCodeFence]);
+
+  const cancelButton = onStop && elapsed >= 5 && (
+    <button
+      type="button"
+      onClick={onStop}
+      className="text-xs text-gray-400 underline transition-colors hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
+    >
+      Cancel
+    </button>
+  );
 
   // State 1: No content yet — bouncing dots
   if (!hasVisibleContent) {
     return (
-      <span className="inline-flex items-center gap-1 py-1">
-        {[0, 1, 2].map((i) => (
-          <span
-            key={i}
-            className="inline-block h-2 w-2 rounded-full bg-gray-400 dark:bg-gray-500"
-            style={{
-              animation: "bounce-dot 1.2s ease-in-out infinite",
-              animationDelay: `${i * 0.2}s`,
-            }}
-          />
-        ))}
-      </span>
+      <div className="flex flex-col gap-1 py-1">
+        <span className="inline-flex items-center gap-1">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="inline-block h-2 w-2 rounded-full bg-gray-400 dark:bg-gray-500"
+              style={{
+                animation: "bounce-dot 1.2s ease-in-out infinite",
+                animationDelay: `${i * 0.2}s`,
+              }}
+            />
+          ))}
+        </span>
+        {cancelButton}
+      </div>
     );
   }
 
@@ -83,6 +99,7 @@ export function StreamingStatus({
           </svg>
           <span>{message}</span>
           <span className="tabular-nums">{formatElapsed(elapsed)}</span>
+          {cancelButton}
         </div>
       </>
     );

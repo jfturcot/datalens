@@ -7,6 +7,7 @@ import { VizRenderer } from "../viz/VizRenderer";
 interface MessageBubbleProps {
   message: ChatMessage;
   onVizClick?: (display: DisplayData) => void;
+  onStop?: () => void;
 }
 
 /**
@@ -21,7 +22,7 @@ function stripCodeFences(text: string): string {
   return result.trim();
 }
 
-export function MessageBubble({ message, onVizClick }: MessageBubbleProps) {
+export function MessageBubble({ message, onVizClick, onStop }: MessageBubbleProps) {
   const isUser = message.role === "user";
 
   return (
@@ -86,6 +87,7 @@ export function MessageBubble({ message, onVizClick }: MessageBubbleProps) {
             <StreamingStatus
               hasVisibleContent={!!stripCodeFences(message.content)}
               hasCodeFence={message.content.includes("```")}
+              onStop={onStop}
             />
           )}
         </div>

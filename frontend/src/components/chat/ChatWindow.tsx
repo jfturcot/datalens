@@ -46,7 +46,12 @@ export function ChatWindow({
             </div>
           )}
           {visibleMessages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} onVizClick={onVizClick} />
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              onVizClick={onVizClick}
+              onStop={msg.isStreaming ? onStop : undefined}
+            />
           ))}
           {toolStatus && <StatusIndicator status={toolStatus} />}
           <div ref={bottomRef} />
