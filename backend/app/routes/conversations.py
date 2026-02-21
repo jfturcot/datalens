@@ -182,9 +182,7 @@ async def send_message(
                         # Handle list-of-blocks format from Anthropic models
                         if isinstance(content, list):
                             content = "".join(
-                                b.get("text", "")
-                                if isinstance(b, dict)
-                                else str(b)
+                                b.get("text", "") if isinstance(b, dict) else str(b)
                                 for b in content
                             )
                         if isinstance(content, str) and content:
