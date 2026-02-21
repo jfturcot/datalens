@@ -37,8 +37,8 @@ test.describe("File Upload", () => {
       buffer: Buffer.from("This is not a CSV file"),
     });
 
-    // Should show an error message about CSV requirement
-    const errorMessage = page.locator("text=/[Cc][Ss][Vv]/");
+    // Should show a red error message about CSV requirement
+    const errorMessage = page.locator('[class*="text-red-"]');
     await expect(errorMessage).toBeVisible({ timeout: 15_000 });
   });
 

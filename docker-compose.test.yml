@@ -19,6 +19,8 @@ services:
     environment:
       APP_ENV: test
       POSTGRES_DB: datalens_test
+    volumes:
+      - shared-tmp:/tmp/datalens
     depends_on:
       postgres:
         condition: service_healthy
@@ -32,6 +34,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-datalens}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-production}
       POSTGRES_DB: datalens_test
+    volumes:
+      - shared-tmp:/tmp/datalens
     ports:
       - "5433:5432"
     healthcheck:
@@ -49,3 +53,6 @@ services:
     ports:
       - "9002:9000"
       - "9003:9001"
+
+volumes:
+  shared-tmp:

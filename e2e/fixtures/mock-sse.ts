@@ -70,9 +70,9 @@ export async function mockLLMResponses(page: Page): Promise<void> {
     function matchKey(content: string): string {
       const lower = content.toLowerCase();
       if (lower.includes("describe this dataset")) return "greeting";
+      if (lower.includes("bar chart")) return "bar_chart";
       if (lower.includes("average arr")) return "avg_arr";
       if (lower.includes("highest growth")) return "highest_growth";
-      if (lower.includes("bar chart")) return "bar_chart";
       return "fallback";
     }
 
