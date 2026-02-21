@@ -146,7 +146,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check LLM configuration
+        id: llm
+        env:
+          KEY: ${{ secrets.LITELLM_API_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::notice::LITELLM_API_KEY not configured — skipping e2e tests"
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create test .env
+        if: steps.llm.outputs.available == 'true'
         run: |
           printf '%s\n' \
             'POSTGRES_USER=datalens' \
@@ -164,28 +177,32 @@ jobs:
             > .env
 
       - name: Start services
+        if: steps.llm.outputs.available == 'true'
         run: docker compose -f docker-compose.test.yml up -d --build --wait
 
       - uses: actions/setup-node@v4
+        if: steps.llm.outputs.available == 'true'
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: e2e/package-lock.json
 
       - name: Install E2E dependencies
+        if: steps.llm.outputs.available == 'true'
         working-directory: e2e
         run: |
           npm ci
           npx playwright install --with-deps chromium
 
       - name: Run Playwright tests
+        if: steps.llm.outputs.available == 'true'
         working-directory: e2e
         run: npx playwright test
         env:
           CI: true
 
       - name: Upload test screenshots on failure
-        if: failure()
+        if: failure() && steps.llm.outputs.available == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: playwright-screenshots
@@ -193,5 +210,5 @@ jobs:
           retention-days: 7
 
       - name: Stop services
-        if: always()
+        if: always() && steps.llm.outputs.available == 'true'
         run: docker compose -f docker-compose.test.yml down -v

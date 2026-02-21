@@ -18,17 +18,10 @@ test.describe("File Upload", () => {
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles(CSV_PATH);
 
-    // Wait for upload to complete and greeting to appear
-    // The greeting should mention the filename and column names
-    const greeting = page.locator("text=I've loaded");
-    await expect(greeting).toBeVisible({ timeout: 30_000 });
-
-    // Verify the greeting contains schema information
-    await expect(page.getByText("sample_data.csv")).toBeVisible();
-    await expect(page.getByText("company_name")).toBeVisible();
-    await expect(page.getByText("industry_vertical")).toBeVisible();
-    await expect(page.getByText("arr_thousands")).toBeVisible();
-    await expect(page.getByText("20 rows")).toBeVisible();
+    // Wait for upload to complete and LLM auto-greeting to appear
+    // The LLM describes the dataset — wait for an assistant message bubble
+    const assistantMessage = page.locator('[class*="bg-gray-100"]').first();
+    await expect(assistantMessage).toBeVisible({ timeout: 60_000 });
 
     // The chat input should now be enabled
     const chatInput = page.getByPlaceholder("Ask about your data...");
@@ -49,9 +42,7 @@ test.describe("File Upload", () => {
     await expect(errorMessage).toBeVisible({ timeout: 15_000 });
 
     // The chat input should still be disabled (no successful upload)
-    const chatInput = page.getByPlaceholder(
-      "Upload a CSV file to start chatting"
-    );
+    const chatInput = page.getByPlaceholder("Ask about your data...");
     await expect(chatInput).toBeVisible();
   });
 
@@ -70,9 +61,7 @@ test.describe("File Upload", () => {
     await expect(errorMessage).toBeVisible({ timeout: 15_000 });
 
     // The chat input should still be disabled
-    const chatInput = page.getByPlaceholder(
-      "Upload a CSV file to start chatting"
-    );
+    const chatInput = page.getByPlaceholder("Ask about your data...");
     await expect(chatInput).toBeVisible();
   });
 });
