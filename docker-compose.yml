@@ -1,22 +1,29 @@
 services:
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
     ports:
-      - "80:80"
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://api:8000
     depends_on:
       - api
 
   api:
     build:
       context: ./backend
-      dockerfile: Dockerfile
-    expose:
-      - "8000"
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
     env_file:
       - .env
     volumes:
+      - ./backend:/app
       - shared-tmp:/tmp/datalens
     depends_on:
       postgres:
@@ -27,16 +34,16 @@ services:
   postgres:
     image: pgduckdb/pgduckdb:18-v1.1.1
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:-datalens}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-datalens-dev}
+      POSTGRES_DB: ${POSTGRES_DB:-datalens}
     volumes:
       - pgdata:/var/lib/postgresql/data
       - shared-tmp:/tmp/datalens
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-datalens} -d ${POSTGRES_DB:-datalens}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -45,8 +52,8 @@ services:
     image: minio/minio
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-datalens}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-datalens-dev}
     volumes:
       - miniodata:/data
     ports:
@@ -57,3 +64,4 @@ volumes:
   pgdata:
   miniodata:
   shared-tmp:
+  frontend_node_modules:
