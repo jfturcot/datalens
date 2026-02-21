@@ -4,6 +4,7 @@ import {
   getConversation,
   listConversations,
 } from "../lib/api";
+import { extractDisplay } from "../lib/displayExtractor";
 import type {
   ChatMessage,
   ConversationResponse,
@@ -38,11 +39,31 @@ export function useConversations(): UseConversationsReturn {
 
   const loadHistory = useCallback(async (id: string): Promise<ChatMessage[]> => {
     const detail = await getConversation(id);
-    return detail.messages.map((m, i) => ({
-      id: `history-${i}`,
-      role: m.role as "user" | "assistant",
-      content: m.content,
-    }));
+    return detail.messages.map((m, i) => {
+      if (m.display) {
+        return {
+          id: `history-${i}`,
+          role: m.role as "user" | "assistant",
+          content: m.content,
+          display: m.display,
+        };
+      }
+      // Client-side fallback: extract display from content if backend didn't
+      if (m.role === "assistant") {
+        const { display, cleanedContent } = extractDisplay(m.content);
+        return {
+          id: `history-${i}`,
+          role: m.role as "user" | "assistant",
+          content: display ? cleanedContent : m.content,
+          display: display ?? undefined,
+        };
+      }
+      return {
+        id: `history-${i}`,
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      };
+    });
   }, []);
 
   const remove = useCallback(

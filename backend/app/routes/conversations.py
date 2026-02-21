@@ -90,7 +90,14 @@ async def get_conversation(
                     msg.content if isinstance(msg.content, str) else str(msg.content)
                 )
                 if content:
-                    messages.append(ConversationMessage(role=role, content=content))
+                    display = None
+                    if role == "assistant":
+                        display, content = _extract_display_from_content(content)
+                    messages.append(
+                        ConversationMessage(
+                            role=role, content=content, display=display
+                        )
+                    )
     except Exception:
         logger.exception(
             "Failed to retrieve message history for conversation %s", conversation_id
@@ -194,9 +201,11 @@ async def send_message(
 
             # After stream completes, send the message_complete event
             # Try to parse display hints from the accumulated content
-            last_display = _extract_display_from_content(accumulated_content)
+            last_display, cleaned_content = _extract_display_from_content(
+                accumulated_content
+            )
 
-            complete_data: dict[str, Any] = {"content": accumulated_content}
+            complete_data: dict[str, Any] = {"content": cleaned_content}
             if last_sql:
                 complete_data["sql"] = last_sql
             if last_display:
@@ -238,33 +247,90 @@ def _summarize_tool_output(output: Any) -> str:
     return str(output)[:200]
 
 
-def _extract_display_from_content(content: str) -> dict[str, Any] | None:
-    """Try to extract a JSON display object from the agent's response content."""
-    # Look for JSON block containing display hints
-    # The agent is instructed to include display JSON in its response
+_DISPLAY_TYPES = frozenset(
+    {"text", "table", "bar_chart", "line_chart", "pie_chart", "scatter_plot"}
+)
+
+
+def _find_brace_balanced_json(text: str, start: int) -> str | None:
+    """Extract a brace-balanced JSON substring starting at ``text[start]``.
+
+    Returns the substring from the opening ``{`` through the matching ``}``
+    (inclusive), or ``None`` if braces never balance.
+    """
+    if start >= len(text) or text[start] != "{":
+        return None
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if escape:
+            escape = False
+            continue
+        if ch == "\\":
+            if in_string:
+                escape = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return None
+
+
+def _extract_display_from_content(
+    content: str,
+) -> tuple[dict[str, Any] | None, str]:
+    """Extract a display-hint JSON object from the agent's response.
+
+    Returns ``(display_dict, cleaned_content)`` where *cleaned_content* has the
+    JSON block (and surrounding fences if present) removed so it doesn't leak
+    into the chat bubble.
+    """
     import re
 
-    # Try to find a JSON code block
-    json_match = re.search(r"```(?:json)?\s*(\{[^`]*\})\s*```", content, re.DOTALL)
-    if json_match:
+    # Strategy 1: fenced code block  ```json { ... } ```
+    fence_re = re.compile(r"```(?:json)?\s*\{", re.DOTALL)
+    for m in fence_re.finditer(content):
+        brace_start = m.end() - 1  # position of the '{'
+        blob = _find_brace_balanced_json(content, brace_start)
+        if blob is None:
+            continue
         try:
-            parsed = json.loads(json_match.group(1))
-            if "type" in parsed:
-                return parsed
+            parsed = json.loads(blob)
         except json.JSONDecodeError:
-            pass
+            continue
+        if isinstance(parsed, dict) and parsed.get("type") in _DISPLAY_TYPES:
+            # Remove the entire fenced block (``` ... ```)
+            block_end = content.find("```", brace_start + len(blob))
+            if block_end != -1:
+                fence_end = block_end + 3
+            else:
+                fence_end = brace_start + len(blob)
+            cleaned = content[: m.start()] + content[fence_end:]
+            return parsed, cleaned.strip()
 
-    # Try to find inline JSON with "display" or "type" key
-    display_match = re.search(
-        r'\{[^{}]*"type"\s*:\s*"(?:text|table|bar_chart|line_chart|pie_chart|scatter_plot)"[^{}]*\}',
-        content,
-    )
-    if display_match:
+    # Strategy 2: bare JSON object with a display type key
+    for i in range(len(content)):
+        if content[i] != "{":
+            continue
+        blob = _find_brace_balanced_json(content, i)
+        if blob is None:
+            continue
         try:
-            parsed = json.loads(display_match.group(0))
-            if "type" in parsed:
-                return parsed
+            parsed = json.loads(blob)
         except json.JSONDecodeError:
-            pass
+            continue
+        if isinstance(parsed, dict) and parsed.get("type") in _DISPLAY_TYPES:
+            cleaned = content[:i] + content[i + len(blob) :]
+            return parsed, cleaned.strip()
 
-    return None
+    return None, content

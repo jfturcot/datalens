@@ -67,6 +67,7 @@ class ConversationResponse(BaseModel):
 class ConversationMessage(BaseModel):
     role: str
     content: str
+    display: DisplayData | None = None
 
 
 class ConversationDetailResponse(BaseModel):

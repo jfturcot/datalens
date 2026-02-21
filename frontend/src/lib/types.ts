@@ -27,6 +27,7 @@ export interface ConversationResponse {
 export interface ConversationMessage {
   role: string;
   content: string;
+  display?: DisplayData;
 }
 
 export interface ConversationDetailResponse {
