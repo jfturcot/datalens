@@ -169,8 +169,6 @@ async def send_message(
 
     async def event_generator():
         accumulated_content = ""
-        last_sql: str | None = None
-        last_display: dict[str, Any] | None = None
 
         try:
             async for event in graph.astream_events(
@@ -200,13 +198,6 @@ async def send_message(
 
                 elif kind == "on_tool_start":
                     tool_name = event.get("name", "unknown")
-                    # Capture SQL input before the tool runs
-                    if tool_name == "execute_query":
-                        tool_input = event.get("data", {}).get("input", {})
-                        if isinstance(tool_input, dict):
-                            last_sql = tool_input.get("sql")
-                        elif isinstance(tool_input, str):
-                            last_sql = tool_input
                     yield {
                         "event": "tool_start",
                         "data": json.dumps({"tool": tool_name}),
@@ -214,22 +205,13 @@ async def send_message(
 
                 elif kind == "on_tool_end":
                     tool_output = event.get("data", {}).get("output", "")
-                    # Parse tool output for SQL and display info
                     summary = _summarize_tool_output(tool_output)
-
-                    # Clear SQL if the query failed
-                    tool_name = event.get("name", "")
-                    if tool_name == "execute_query" and isinstance(tool_output, dict):
-                        if not tool_output.get("success"):
-                            last_sql = None
-
                     yield {
                         "event": "tool_end",
                         "data": json.dumps({"summary": summary}),
                     }
 
-            # After stream completes, send the message_complete event
-            # Try to parse display hints from the accumulated content
+            # After stream completes, extract display hints from content
             last_display, cleaned_content = _extract_display_from_content(
                 accumulated_content
             )
@@ -239,6 +221,23 @@ async def send_message(
                     "I wasn't able to generate a complete response. "
                     "Could you try rephrasing your question?"
                 )
+
+            # Read SQL from checkpoint state (same as history reconstruction)
+            last_sql: str | None = None
+            try:
+                state = await graph.aget_state(config)
+                if state and state.values and "messages" in state.values:
+                    for msg in reversed(state.values["messages"]):
+                        if getattr(msg, "type", None) in ("ai", "AIMessage"):
+                            for tc in getattr(msg, "tool_calls", []):
+                                if tc.get("name") == "execute_query":
+                                    sql = tc.get("args", {}).get("sql")
+                                    if sql:
+                                        last_sql = sql
+                            if last_sql:
+                                break
+            except Exception:
+                logger.debug("Could not read SQL from checkpoint state")
 
             complete_data: dict[str, Any] = {"content": cleaned_content}
             if last_sql:
