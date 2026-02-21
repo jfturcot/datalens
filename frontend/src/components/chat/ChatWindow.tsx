@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { ChatMessage, ToolStatus } from "../../lib/types";
+import type { ChatMessage, DisplayData, ToolStatus } from "../../lib/types";
 import { ChatInput } from "./ChatInput";
 import { MessageBubble } from "./MessageBubble";
 import { StatusIndicator } from "./StatusIndicator";
@@ -11,6 +11,7 @@ interface ChatWindowProps {
   inputDisabled: boolean;
   onSubmit: (content: string) => void;
   onStop: () => void;
+  onVizClick?: (display: DisplayData) => void;
 }
 
 export function ChatWindow({
@@ -20,6 +21,7 @@ export function ChatWindow({
   inputDisabled,
   onSubmit,
   onStop,
+  onVizClick,
 }: ChatWindowProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -39,7 +41,7 @@ export function ChatWindow({
             </div>
           )}
           {messages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} />
+            <MessageBubble key={msg.id} message={msg} onVizClick={onVizClick} />
           ))}
           {toolStatus && <StatusIndicator status={toolStatus} />}
           <div ref={bottomRef} />

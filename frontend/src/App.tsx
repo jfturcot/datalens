@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Layout } from "./components/layout/Layout";
 import { FileDropZone } from "./components/chat/FileDropZone";
 import { ChatWindow } from "./components/chat/ChatWindow";
+import { VizPanel } from "./components/viz/VizPanel";
 import { createSession, getMySession } from "./lib/api";
 import { useChat } from "./hooks/useChat";
 import { useFileUpload } from "./hooks/useFileUpload";
 import { useConversations } from "./hooks/useConversations";
-import type { ColumnInfo } from "./lib/types";
+import type { ColumnInfo, DisplayData } from "./lib/types";
 
 type AppState = "loading" | "no-file" | "chat";
 
@@ -19,6 +20,7 @@ function App() {
   const [appState, setAppState] = useState<AppState>("loading");
   const [sessionReady, setSessionReady] = useState(false);
   const [showDropZone, setShowDropZone] = useState(false);
+  const [vizDisplay, setVizDisplay] = useState<DisplayData | null>(null);
   const initRef = useRef(false);
 
   const { messages, toolStatus, isLoading, submit, stop, setMessages } =
@@ -71,6 +73,11 @@ function App() {
     })();
   }, [activeId, loadHistory, setMessages]);
 
+  // Close viz panel when switching conversations
+  useEffect(() => {
+    setVizDisplay(null);
+  }, [activeId]);
+
   const handleFile = useCallback(
     async (file: File) => {
       const result = await upload(file);
@@ -99,6 +106,7 @@ function App() {
     setShowDropZone(true);
     setActiveId(null);
     setMessages([]);
+    setVizDisplay(null);
   }, [setActiveId, setMessages]);
 
   const handleSelectConversation = useCallback(
@@ -115,6 +123,7 @@ function App() {
       if (conversations.length <= 1) {
         setAppState("no-file");
         setMessages([]);
+        setVizDisplay(null);
       }
     },
     [remove, conversations.length, setMessages],
@@ -127,6 +136,14 @@ function App() {
     },
     [activeId, submit],
   );
+
+  const handleVizClick = useCallback((display: DisplayData) => {
+    setVizDisplay(display);
+  }, []);
+
+  const handleVizClose = useCallback(() => {
+    setVizDisplay(null);
+  }, []);
 
   if (appState === "loading") {
     return (
@@ -146,23 +163,31 @@ function App() {
       onNewConversation={handleNewConversation}
       onDeleteConversation={handleDelete}
     >
-      {showFileUpload ? (
-        <FileDropZone
-          onFile={handleFile}
-          uploading={uploading}
-          progress={progress}
-          error={uploadError}
-        />
-      ) : (
-        <ChatWindow
-          messages={messages}
-          toolStatus={toolStatus}
-          isLoading={isLoading}
-          inputDisabled={!activeId}
-          onSubmit={handleSubmit}
-          onStop={stop}
-        />
-      )}
+      <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden">
+          {showFileUpload ? (
+            <FileDropZone
+              onFile={handleFile}
+              uploading={uploading}
+              progress={progress}
+              error={uploadError}
+            />
+          ) : (
+            <ChatWindow
+              messages={messages}
+              toolStatus={toolStatus}
+              isLoading={isLoading}
+              inputDisabled={!activeId}
+              onSubmit={handleSubmit}
+              onStop={stop}
+              onVizClick={handleVizClick}
+            />
+          )}
+        </div>
+        {vizDisplay && (
+          <VizPanel display={vizDisplay} onClose={handleVizClose} />
+        )}
+      </div>
     </Layout>
   );
 }

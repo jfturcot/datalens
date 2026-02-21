@@ -1,11 +1,13 @@
-import type { ChatMessage } from "../../lib/types";
+import type { ChatMessage, DisplayData } from "../../lib/types";
 import { SQLBlock } from "./SQLBlock";
+import { VizRenderer } from "../viz/VizRenderer";
 
 interface MessageBubbleProps {
   message: ChatMessage;
+  onVizClick?: (display: DisplayData) => void;
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({ message, onVizClick }: MessageBubbleProps) {
   const isUser = message.role === "user";
 
   return (
@@ -25,6 +27,27 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         </p>
 
         {!isUser && message.sql && <SQLBlock sql={message.sql} />}
+
+        {!isUser && message.display && (
+          <div
+            className="mt-3 cursor-pointer rounded-lg border border-gray-200 bg-white p-3 transition-shadow hover:shadow-md dark:border-gray-600 dark:bg-gray-900"
+            onClick={() => onVizClick?.(message.display!)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onVizClick?.(message.display!);
+              }
+            }}
+            aria-label="Click to expand visualization"
+          >
+            <VizRenderer display={message.display} compact />
+            <p className="mt-2 text-center text-[10px] text-gray-400 dark:text-gray-500">
+              Click to expand
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
