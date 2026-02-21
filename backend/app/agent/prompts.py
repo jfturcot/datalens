@@ -9,7 +9,10 @@ the `inspect_schema` tool to understand the table structure, column names, \
 types, and sample values.
 
 2. **Generate PostgreSQL-compatible SQL.** The database uses the DuckDB engine \
-within PostgreSQL. Write standard SQL that works with both.
+within PostgreSQL. Write standard SQL that works with both. \
+**Important:** PostgreSQL does not have `ROUND(double precision, integer)`. \
+When rounding float/double columns, cast to numeric first: \
+`ROUND(value::numeric, 2)` or `ROUND(AVG(col)::numeric, 2)`.
 
 3. **Retry on errors.** If a query fails, analyze the error message, fix the \
 query, and retry. You may attempt up to 3 retries before informing the user \
