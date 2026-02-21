@@ -8,6 +8,18 @@ interface MessageBubbleProps {
   onVizClick?: (display: DisplayData) => void;
 }
 
+/**
+ * Strip fenced code blocks from content so raw JSON display hints
+ * don't flash in the bubble while streaming.
+ */
+function stripCodeFences(text: string): string {
+  // Remove all complete fenced blocks: ```...```
+  let result = text.replace(/```[\s\S]*?```/g, "");
+  // Remove any trailing unclosed fence (still streaming)
+  result = result.replace(/```[\s\S]*$/, "");
+  return result.trim();
+}
+
 export function MessageBubble({ message, onVizClick }: MessageBubbleProps) {
   const isUser = message.role === "user";
 
@@ -66,7 +78,7 @@ export function MessageBubble({ message, onVizClick }: MessageBubbleProps) {
                 ),
               }}
             >
-              {message.content}
+              {stripCodeFences(message.content)}
             </ReactMarkdown>
           )}
           {message.isStreaming && (
