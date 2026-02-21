@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface ChatInputProps {
   disabled: boolean;
@@ -35,6 +35,12 @@ export function ChatInput({
     },
     [handleSubmit],
   );
+
+  useEffect(() => {
+    if (!disabled && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [disabled]);
 
   const handleInput = useCallback(() => {
     const el = textareaRef.current;

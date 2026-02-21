@@ -200,6 +200,13 @@ async def send_message(
 
                 elif kind == "on_tool_start":
                     tool_name = event.get("name", "unknown")
+                    # Capture SQL input before the tool runs
+                    if tool_name == "execute_query":
+                        tool_input = event.get("data", {}).get("input", {})
+                        if isinstance(tool_input, dict):
+                            last_sql = tool_input.get("sql")
+                        elif isinstance(tool_input, str):
+                            last_sql = tool_input
                     yield {
                         "event": "tool_start",
                         "data": json.dumps({"tool": tool_name}),
@@ -210,11 +217,11 @@ async def send_message(
                     # Parse tool output for SQL and display info
                     summary = _summarize_tool_output(tool_output)
 
-                    # Track SQL from execute_query results
+                    # Clear SQL if the query failed
                     tool_name = event.get("name", "")
                     if tool_name == "execute_query" and isinstance(tool_output, dict):
-                        if tool_output.get("success"):
-                            last_sql = event.get("data", {}).get("input", {}).get("sql")
+                        if not tool_output.get("success"):
+                            last_sql = None
 
                     yield {
                         "event": "tool_end",
