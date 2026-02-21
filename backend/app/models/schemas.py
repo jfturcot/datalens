@@ -13,3 +13,16 @@ class SessionResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str
+
+
+class ColumnInfo(BaseModel):
+    name: str
+    type: str
+
+
+class UploadResponse(BaseModel):
+    conversation_id: uuid.UUID
+    filename: str
+    table_name: str
+    row_count: int
+    columns: list[ColumnInfo]

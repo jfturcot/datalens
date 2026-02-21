@@ -16,6 +16,8 @@ services:
       - "8000"
     env_file:
       - .env
+    volumes:
+      - shared-tmp:/tmp/datalens
     depends_on:
       postgres:
         condition: service_healthy
@@ -30,6 +32,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - shared-tmp:/tmp/datalens
     ports:
       - "5432:5432"
     healthcheck:
@@ -53,3 +56,4 @@ services:
 volumes:
   pgdata:
   miniodata:
+  shared-tmp:

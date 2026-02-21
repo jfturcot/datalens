@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from alembic import command
 from app.models import engine
-from app.routes import health, sessions
+from app.routes import health, sessions, upload
 
 logger = logging.getLogger(__name__)
 
@@ -20,11 +20,24 @@ def run_migrations() -> None:
     command.upgrade(alembic_cfg, "head")
 
 
+async def enable_pg_duckdb() -> None:
+    """Enable the pg_duckdb extension so read_csv() is available."""
+    from sqlalchemy import text
+
+    from app.models.database import async_session_factory
+
+    async with async_session_factory() as session:
+        await session.execute(text("CREATE EXTENSION IF NOT EXISTS pg_duckdb"))
+        await session.commit()
+    logger.info("pg_duckdb extension enabled")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    # Startup: run migrations
+    # Startup: run migrations, then enable pg_duckdb
     run_migrations()
     logger.info("Database migrations applied")
+    await enable_pg_duckdb()
     yield
     # Shutdown: dispose engine
     await engine.dispose()
@@ -42,3 +55,4 @@ app.add_middleware(
 
 app.include_router(health.router, prefix="/api")
 app.include_router(sessions.router, prefix="/api")
+app.include_router(upload.router, prefix="/api")
