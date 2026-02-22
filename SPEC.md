@@ -963,3 +963,17 @@ These were not in the original spec but were added during deployment:
 | "8GB RAM"                            | s-2vcpu-4gb (4GB, sufficient for the workload)  |
 | "Cloudflare handles TLS termination" | Let's Encrypt on droplet, Cloudflare Full/Strict|
 | "Domain: TBD"                        | `datalens.solution30.com`                        |
+
+### 16.5 Access Password
+
+The spec's roadmap (section 14) lists user authentication as a future item. A
+lightweight password gate was added instead — not full auth, just enough to
+prevent unauthorized use of LLM credits on the public deployment.
+
+When the `ACCESS_PASSWORD` environment variable is set, `POST /api/sessions`
+requires a matching `password` field in the request body. Without it, the
+endpoint returns 401. The frontend shows a simple password prompt before the
+app loads. Once authenticated, the session cookie grants access as before.
+
+In development (`ACCESS_PASSWORD` unset or empty), the app works without any
+password — no change to the local dev experience.
