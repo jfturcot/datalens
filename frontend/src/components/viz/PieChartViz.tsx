@@ -16,7 +16,8 @@ interface PieChartVizProps {
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
 
 export function PieChartViz({ display, compact }: PieChartVizProps) {
-  const { data, label_key, value_key, title } = display;
+  const { data: rawData, label_key, value_key, title } = display;
+  const data = rawData ?? [];
   if (!label_key || !value_key || data.length === 0) return null;
 
   const height = compact ? 200 : 400;

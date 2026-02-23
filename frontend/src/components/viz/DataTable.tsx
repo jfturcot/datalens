@@ -6,7 +6,7 @@ interface DataTableProps {
 }
 
 export function DataTable({ display, compact }: DataTableProps) {
-  const rows = display.data;
+  const rows = display.data ?? [];
   const firstRow = rows[0];
   if (!firstRow) return null;
 

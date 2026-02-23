@@ -15,7 +15,8 @@ interface BarChartVizProps {
 }
 
 export function BarChartViz({ display, compact }: BarChartVizProps) {
-  const { data, x_axis, y_axis, title } = display;
+  const { data: rawData, x_axis, y_axis, title } = display;
+  const data = rawData ?? [];
   if (!x_axis || !y_axis || data.length === 0) return null;
 
   const height = compact ? 200 : 400;

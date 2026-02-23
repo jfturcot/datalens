@@ -73,11 +73,17 @@ export function useChat(): UseChatReturn {
         onmessage: (event) => {
           if (!event.data) return;
 
+          let parsed: Record<string, unknown>;
+          try {
+            parsed = JSON.parse(event.data) as Record<string, unknown>;
+          } catch {
+            console.warn("useChat: failed to parse SSE data", event.data);
+            return;
+          }
+
           switch (event.event) {
             case "token": {
-              const { content: token } = JSON.parse(event.data) as {
-                content: string;
-              };
+              const token = typeof parsed.content === "string" ? parsed.content : "";
               accumulated += token;
               setMessages((prev) =>
                 prev.map((m) =>
@@ -89,7 +95,7 @@ export function useChat(): UseChatReturn {
               break;
             }
             case "tool_start": {
-              const { tool } = JSON.parse(event.data) as { tool: string };
+              const tool = typeof parsed.tool === "string" ? parsed.tool : "unknown";
               setToolStatus({ tool, active: true });
               break;
             }
@@ -98,19 +104,17 @@ export function useChat(): UseChatReturn {
               break;
             }
             case "message_complete": {
-              const data = JSON.parse(event.data) as {
-                content: string;
-                sql?: string;
-                display?: DisplayData;
-              };
+              const content = typeof parsed.content === "string" ? parsed.content : accumulated;
+              const sql = typeof parsed.sql === "string" ? parsed.sql : undefined;
+              const display = parsed.display as DisplayData | undefined;
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === assistantId
                     ? {
                         ...m,
-                        content: data.content,
-                        sql: data.sql,
-                        display: data.display,
+                        content,
+                        sql,
+                        display,
                         isStreaming: false,
                       }
                     : m,
@@ -121,7 +125,7 @@ export function useChat(): UseChatReturn {
               break;
             }
             case "error": {
-              const { error } = JSON.parse(event.data) as { error: string };
+              const error = typeof parsed.error === "string" ? parsed.error : "Unknown error";
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === assistantId

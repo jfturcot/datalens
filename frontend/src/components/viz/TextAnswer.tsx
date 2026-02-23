@@ -5,7 +5,7 @@ interface TextAnswerProps {
 }
 
 export function TextAnswer({ display }: TextAnswerProps) {
-  const row = display.data[0];
+  const row = (display.data ?? [])[0];
   if (!row) return null;
 
   const entries = Object.entries(row);
