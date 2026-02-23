@@ -9,6 +9,7 @@ from app.agent.tools import (
     _serialize_value,
     execute_query,
     inspect_schema,
+    present_results,
     validate_query_sql,
 )
 
@@ -326,3 +327,97 @@ class TestExecuteQuery:
 
         assert result["success"] is False
         assert "connection refused" in result["error"]
+
+
+# ---------------------------------------------------------------------------
+# present_results – visualization metadata tool
+# ---------------------------------------------------------------------------
+
+
+class TestPresentResults:
+    @pytest.mark.asyncio
+    async def test_valid_bar_chart(self) -> None:
+        result = await present_results.ainvoke(
+            {
+                "type": "bar_chart",
+                "title": "Sales by Region",
+                "x_axis": "region",
+                "y_axis": "total_sales",
+            }
+        )
+        assert result["success"] is True
+        display = result["display"]
+        assert display["type"] == "bar_chart"
+        assert display["title"] == "Sales by Region"
+        assert display["x_axis"] == "region"
+        assert display["y_axis"] == "total_sales"
+
+    @pytest.mark.asyncio
+    async def test_valid_pie_chart(self) -> None:
+        result = await present_results.ainvoke(
+            {
+                "type": "pie_chart",
+                "title": "Revenue Distribution",
+                "label_key": "category",
+                "value_key": "revenue",
+            }
+        )
+        assert result["success"] is True
+        display = result["display"]
+        assert display["type"] == "pie_chart"
+        assert display["label_key"] == "category"
+        assert display["value_key"] == "revenue"
+
+    @pytest.mark.asyncio
+    async def test_valid_text_type(self) -> None:
+        result = await present_results.ainvoke({"type": "text"})
+        assert result["success"] is True
+        assert result["display"]["type"] == "text"
+
+    @pytest.mark.asyncio
+    async def test_valid_table_type(self) -> None:
+        result = await present_results.ainvoke({"type": "table"})
+        assert result["success"] is True
+        assert result["display"]["type"] == "table"
+
+    @pytest.mark.asyncio
+    async def test_valid_line_chart(self) -> None:
+        result = await present_results.ainvoke(
+            {
+                "type": "line_chart",
+                "title": "Trend",
+                "x_axis": "month",
+                "y_axis": "count",
+            }
+        )
+        assert result["success"] is True
+        assert result["display"]["type"] == "line_chart"
+
+    @pytest.mark.asyncio
+    async def test_valid_scatter_plot(self) -> None:
+        result = await present_results.ainvoke(
+            {
+                "type": "scatter_plot",
+                "title": "Correlation",
+                "x_axis": "height",
+                "y_axis": "weight",
+            }
+        )
+        assert result["success"] is True
+        assert result["display"]["type"] == "scatter_plot"
+
+    @pytest.mark.asyncio
+    async def test_invalid_type_rejected(self) -> None:
+        result = await present_results.ainvoke({"type": "heatmap"})
+        assert result["success"] is False
+        assert "Invalid display type" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_omits_empty_optional_fields(self) -> None:
+        result = await present_results.ainvoke({"type": "table", "title": "Data"})
+        assert result["success"] is True
+        display = result["display"]
+        assert "x_axis" not in display
+        assert "y_axis" not in display
+        assert "label_key" not in display
+        assert "value_key" not in display

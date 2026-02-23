@@ -78,6 +78,8 @@ async def get_conversation(
         state = await graph.aget_state(config)
         if state and state.values and "messages" in state.values:
             last_sql: str | None = None
+            last_query_rows: list[dict[str, Any]] | None = None
+            last_present_meta: dict[str, Any] | None = None
             for msg in state.values["messages"]:
                 role = getattr(msg, "type", "unknown")
                 # Map LangGraph message types to simple roles
@@ -85,13 +87,25 @@ async def get_conversation(
                     role = "user"
                 elif role in ("ai", "AIMessage"):
                     role = "assistant"
-                    # Track SQL from execute_query tool calls
+                    # Track tool calls across AI messages
                     for tc in getattr(msg, "tool_calls", []):
                         if tc.get("name") == "execute_query":
                             sql = tc.get("args", {}).get("sql")
                             if sql:
                                 last_sql = sql
+                        elif tc.get("name") == "present_results":
+                            last_present_meta = tc.get("args", {})
                 elif role == "tool":
+                    # Capture execute_query output for data rows
+                    tool_name = getattr(msg, "name", "")
+                    if tool_name == "execute_query":
+                        try:
+                            raw = msg.content
+                            output = json.loads(raw) if isinstance(raw, str) else raw
+                            if isinstance(output, dict) and output.get("success"):
+                                last_query_rows = output.get("rows", [])
+                        except (json.JSONDecodeError, AttributeError):
+                            pass
                     continue  # Skip tool messages in the history
 
                 content = (
@@ -101,14 +115,29 @@ async def get_conversation(
                     display_data: DisplayData | None = None
                     sql = None
                     if role == "assistant":
-                        raw_display, content = _extract_display_from_content(content)
-                        if raw_display:
+                        # Prefer present_results tool metadata + query data
+                        if last_present_meta and last_query_rows is not None:
                             try:
-                                display_data = DisplayData(**raw_display)
+                                display_data = DisplayData(
+                                    **last_present_meta,
+                                    data=last_query_rows,
+                                )
                             except Exception:
                                 display_data = None
+                        if display_data is None:
+                            # Fallback: embedded JSON in content
+                            raw_display, content = _extract_display_from_content(
+                                content
+                            )
+                            if raw_display:
+                                try:
+                                    display_data = DisplayData(**raw_display)
+                                except Exception:
+                                    display_data = None
                         sql = last_sql
                         last_sql = None
+                        last_query_rows = None
+                        last_present_meta = None
                     messages.append(
                         ConversationMessage(
                             role=role, content=content, sql=sql, display=display_data
@@ -169,6 +198,10 @@ async def send_message(
 
     async def event_generator():
         accumulated_content = ""
+        # Track tool events during streaming for display construction
+        last_query_rows: list[dict[str, Any]] | None = None
+        last_query_sql: str | None = None
+        present_results_meta: dict[str, Any] | None = None
 
         try:
             async for event in graph.astream_events(
@@ -198,23 +231,54 @@ async def send_message(
 
                 elif kind == "on_tool_start":
                     tool_name = event.get("name", "unknown")
+                    # Capture present_results args from on_tool_start
+                    if tool_name == "present_results":
+                        present_results_meta = event.get("data", {}).get("input", {})
+                    # Capture SQL from execute_query tool start
+                    elif tool_name == "execute_query":
+                        tool_input = event.get("data", {}).get("input", {})
+                        sql = (
+                            tool_input.get("sql")
+                            if isinstance(tool_input, dict)
+                            else None
+                        )
+                        if sql:
+                            last_query_sql = sql
                     yield {
                         "event": "tool_start",
                         "data": json.dumps({"tool": tool_name}),
                     }
 
                 elif kind == "on_tool_end":
+                    tool_name = event.get("name", "unknown")
                     tool_output = event.get("data", {}).get("output", "")
+                    # Capture execute_query data rows from on_tool_end
+                    if tool_name == "execute_query" and isinstance(tool_output, dict):
+                        if tool_output.get("success"):
+                            last_query_rows = tool_output.get("rows", [])
                     summary = _summarize_tool_output(tool_output)
                     yield {
                         "event": "tool_end",
                         "data": json.dumps({"summary": summary}),
                     }
 
-            # After stream completes, extract display hints from content
-            last_display, cleaned_content = _extract_display_from_content(
-                accumulated_content
-            )
+            # Build display from present_results + execute_query data
+            last_display: dict[str, Any] | None = None
+            cleaned_content = accumulated_content
+
+            if present_results_meta and last_query_rows is not None:
+                # Structured path: present_results tool was called after
+                # execute_query — combine metadata with query data
+                last_display = {
+                    **present_results_meta,
+                    "data": last_query_rows,
+                }
+            else:
+                # Fallback: extract embedded JSON from content
+                # (supports old conversations with inline display hints)
+                last_display, cleaned_content = _extract_display_from_content(
+                    accumulated_content
+                )
 
             if not cleaned_content.strip():
                 cleaned_content = (
@@ -222,22 +286,27 @@ async def send_message(
                     "Could you try rephrasing your question?"
                 )
 
-            # Read SQL from checkpoint state (same as history reconstruction)
-            last_sql: str | None = None
-            try:
-                state = await graph.aget_state(config)
-                if state and state.values and "messages" in state.values:
-                    for msg in reversed(state.values["messages"]):
-                        if getattr(msg, "type", None) in ("ai", "AIMessage"):
-                            for tc in getattr(msg, "tool_calls", []):
-                                if tc.get("name") == "execute_query":
-                                    sql = tc.get("args", {}).get("sql")
-                                    if sql:
-                                        last_sql = sql
-                            if last_sql:
-                                break
-            except Exception:
-                logger.debug("Could not read SQL from checkpoint state")
+            # SQL: prefer what we captured from streaming events;
+            # fall back to checkpoint state if needed
+            last_sql = last_query_sql
+            if not last_sql:
+                try:
+                    state = await graph.aget_state(config)
+                    if state and state.values and "messages" in state.values:
+                        for msg in reversed(state.values["messages"]):
+                            if getattr(msg, "type", None) in (
+                                "ai",
+                                "AIMessage",
+                            ):
+                                for tc in getattr(msg, "tool_calls", []):
+                                    if tc.get("name") == "execute_query":
+                                        sql = tc.get("args", {}).get("sql")
+                                        if sql:
+                                            last_sql = sql
+                                if last_sql:
+                                    break
+                except Exception:
+                    logger.debug("Could not read SQL from checkpoint state")
 
             complete_data: dict[str, Any] = {"content": cleaned_content}
             if last_sql:

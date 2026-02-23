@@ -231,3 +231,52 @@ async def execute_query(sql: str) -> dict[str, Any]:
     except Exception as e:
         logger.exception("Error executing query")
         return {"success": False, "error": str(e)}
+
+
+_VALID_DISPLAY_TYPES = frozenset(
+    {"text", "table", "bar_chart", "line_chart", "pie_chart", "scatter_plot"}
+)
+
+
+@tool
+async def present_results(
+    type: str,
+    title: str = "",
+    x_axis: str = "",
+    y_axis: str = "",
+    label_key: str = "",
+    value_key: str = "",
+) -> dict[str, Any]:
+    """Present query results with a visualization. Call this AFTER execute_query
+    to tell the frontend how to display the data. Do NOT include the data array —
+    the backend attaches it automatically from the last query result.
+
+    Args:
+        type: Visualization type. One of: text, table, bar_chart, line_chart,
+              pie_chart, scatter_plot.
+        title: Chart title (required for charts, optional for text/table).
+        x_axis: Column name for the x-axis (bar_chart, line_chart, scatter_plot).
+        y_axis: Column name for the y-axis (bar_chart, line_chart, scatter_plot).
+        label_key: Column name for labels (pie_chart).
+        value_key: Column name for values (pie_chart).
+    """
+    if type not in _VALID_DISPLAY_TYPES:
+        return {
+            "success": False,
+            "error": f"Invalid display type '{type}'. "
+            f"Must be one of: {', '.join(sorted(_VALID_DISPLAY_TYPES))}",
+        }
+
+    meta: dict[str, Any] = {"type": type}
+    if title:
+        meta["title"] = title
+    if x_axis:
+        meta["x_axis"] = x_axis
+    if y_axis:
+        meta["y_axis"] = y_axis
+    if label_key:
+        meta["label_key"] = label_key
+    if value_key:
+        meta["value_key"] = value_key
+
+    return {"success": True, "display": meta}

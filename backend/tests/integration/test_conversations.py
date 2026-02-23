@@ -387,6 +387,165 @@ class TestSendMessage:
         )
         assert resp.status_code == 401
 
+    async def test_present_results_display_in_message_complete(
+        self, client: AsyncClient, session_id: str, conversation_id: str
+    ) -> None:
+        """Full flow: execute_query + present_results → display in message_complete."""
+        query_rows = [
+            {"region": "East", "sales": 100},
+            {"region": "West", "sales": 200},
+        ]
+
+        async def mock_astream_events(input_data, config, version):
+            # execute_query tool start
+            yield {
+                "event": "on_tool_start",
+                "name": "execute_query",
+                "data": {"input": {"sql": "SELECT region, sales FROM t"}},
+            }
+            # execute_query tool end with data
+            yield {
+                "event": "on_tool_end",
+                "name": "execute_query",
+                "data": {
+                    "output": {
+                        "success": True,
+                        "row_count": 2,
+                        "columns": ["region", "sales"],
+                        "rows": query_rows,
+                    }
+                },
+            }
+            # present_results tool start with metadata
+            yield {
+                "event": "on_tool_start",
+                "name": "present_results",
+                "data": {
+                    "input": {
+                        "type": "bar_chart",
+                        "title": "Sales by Region",
+                        "x_axis": "region",
+                        "y_axis": "sales",
+                    }
+                },
+            }
+            # present_results tool end
+            yield {
+                "event": "on_tool_end",
+                "name": "present_results",
+                "data": {"output": {"success": True, "display": {"type": "bar_chart"}}},
+            }
+            # Final content tokens
+            yield {
+                "event": "on_chat_model_stream",
+                "data": {"chunk": MagicMock(content="Here are the sales by region.")},
+            }
+
+        mock_graph = MagicMock()
+        mock_graph.astream_events = mock_astream_events
+
+        app = client._transport.app  # type: ignore[attr-defined]
+        app.state.agent_graph = mock_graph
+
+        resp = await client.post(
+            f"/api/conversations/{conversation_id}/messages",
+            json={"content": "Show sales by region"},
+            cookies=_session_cookie(session_id),
+        )
+        assert resp.status_code == 200
+        events = _parse_sse(resp.text)
+
+        # Verify message_complete has display
+        complete_events = [e for e in events if e["event"] == "message_complete"]
+        assert len(complete_events) == 1
+        complete_data = json.loads(complete_events[0]["data"])
+        assert complete_data["content"] == "Here are the sales by region."
+        assert complete_data["sql"] == "SELECT region, sales FROM t"
+        assert complete_data["display"]["type"] == "bar_chart"
+        assert complete_data["display"]["title"] == "Sales by Region"
+        assert complete_data["display"]["x_axis"] == "region"
+        assert complete_data["display"]["y_axis"] == "sales"
+        assert complete_data["display"]["data"] == query_rows
+
+    async def test_no_display_without_execute_query(
+        self, client: AsyncClient, session_id: str, conversation_id: str
+    ) -> None:
+        """No display when present_results called but execute_query was not."""
+
+        async def mock_astream_events(input_data, config, version):
+            yield {
+                "event": "on_tool_start",
+                "name": "inspect_schema",
+                "data": {"input": {"table_name": "users"}},
+            }
+            yield {
+                "event": "on_tool_end",
+                "name": "inspect_schema",
+                "data": {
+                    "output": {"table_name": "users", "row_count": 10, "columns": []}
+                },
+            }
+            yield {
+                "event": "on_chat_model_stream",
+                "data": {"chunk": MagicMock(content="The table has 10 rows.")},
+            }
+
+        mock_graph = MagicMock()
+        mock_graph.astream_events = mock_astream_events
+
+        app = client._transport.app  # type: ignore[attr-defined]
+        app.state.agent_graph = mock_graph
+
+        resp = await client.post(
+            f"/api/conversations/{conversation_id}/messages",
+            json={"content": "Show schema"},
+            cookies=_session_cookie(session_id),
+        )
+        assert resp.status_code == 200
+        events = _parse_sse(resp.text)
+
+        complete_events = [e for e in events if e["event"] == "message_complete"]
+        assert len(complete_events) == 1
+        complete_data = json.loads(complete_events[0]["data"])
+        assert "display" not in complete_data
+
+    async def test_fallback_embedded_json_display(
+        self, client: AsyncClient, session_id: str, conversation_id: str
+    ) -> None:
+        """Old-style embedded JSON in content still produces display via fallback."""
+
+        async def mock_astream_events(input_data, config, version):
+            yield {
+                "event": "on_chat_model_stream",
+                "data": {
+                    "chunk": MagicMock(
+                        content='Result: {"type": "text", "data": [{"count": 42}]}'
+                    )
+                },
+            }
+
+        mock_graph = MagicMock()
+        mock_graph.astream_events = mock_astream_events
+
+        app = client._transport.app  # type: ignore[attr-defined]
+        app.state.agent_graph = mock_graph
+
+        resp = await client.post(
+            f"/api/conversations/{conversation_id}/messages",
+            json={"content": "Count rows"},
+            cookies=_session_cookie(session_id),
+        )
+        assert resp.status_code == 200
+        events = _parse_sse(resp.text)
+
+        complete_events = [e for e in events if e["event"] == "message_complete"]
+        assert len(complete_events) == 1
+        complete_data = json.loads(complete_events[0]["data"])
+        assert complete_data["display"] is not None
+        assert complete_data["display"]["type"] == "text"
+        # Content should have JSON stripped
+        assert "{" not in complete_data["content"]
+
 
 def _parse_sse(text: str) -> list[dict[str, str]]:
     """Parse SSE text into a list of {event, data} dicts.
