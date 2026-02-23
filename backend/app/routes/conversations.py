@@ -25,6 +25,74 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+async def _repair_orphaned_tool_calls(graph: Any, config: dict[str, Any]) -> None:
+    """Inject synthetic ToolMessages for orphaned tool_calls in the checkpoint.
+
+    When a request crashes mid-tool-call, the checkpoint is left with an
+    AIMessage containing tool_calls but no corresponding ToolMessages.
+    All subsequent requests fail with a LangGraph validation error.
+    This detects the condition and patches the state so the conversation
+    can continue.
+    """
+    from langchain_core.messages import ToolMessage
+
+    try:
+        state = await graph.aget_state(config)
+    except Exception:
+        logger.debug("Could not read checkpoint state for repair check")
+        return
+
+    if not state or not state.values or "messages" not in state.values:
+        return
+
+    messages = state.values["messages"]
+    if not messages:
+        return
+
+    # Walk backwards from the tail to find an AIMessage with tool_calls.
+    # Any ToolMessages between the tail and that AIMessage are "answered".
+    answered_ids: set[str] = set()
+    orphaned_ai_tool_calls: list[dict[str, Any]] = []
+
+    for msg in reversed(messages):
+        msg_type = getattr(msg, "type", "")
+        if msg_type == "tool":
+            tool_call_id = getattr(msg, "tool_call_id", None)
+            if tool_call_id:
+                answered_ids.add(tool_call_id)
+        elif msg_type in ("ai", "AIMessage"):
+            tool_calls = getattr(msg, "tool_calls", [])
+            if tool_calls:
+                orphaned_ai_tool_calls = [
+                    tc for tc in tool_calls if tc.get("id") not in answered_ids
+                ]
+            break
+        else:
+            # Hit a human message or something unexpected — no orphans possible
+            break
+
+    if not orphaned_ai_tool_calls:
+        return
+
+    synthetic = [
+        ToolMessage(
+            content="Tool execution was interrupted. Please retry.",
+            tool_call_id=tc["id"],
+            name=tc.get("name", "unknown"),
+        )
+        for tc in orphaned_ai_tool_calls
+    ]
+
+    thread_id = config.get("configurable", {}).get("thread_id", "?")
+    logger.info(
+        "Repairing %d orphaned tool call(s) in conversation %s",
+        len(synthetic),
+        thread_id,
+    )
+
+    await graph.aupdate_state(config, {"messages": synthetic}, as_node="tools")
+
+
 async def _get_conversation_for_session(
     db: AsyncSession,
     conversation_id: uuid.UUID,
@@ -195,6 +263,9 @@ async def send_message(
 
     graph = request.app.state.agent_graph
     config = {"configurable": {"thread_id": str(conversation_id)}}
+
+    # Pre-flight: repair any orphaned tool calls from a previous crash
+    await _repair_orphaned_tool_calls(graph, config)
 
     async def event_generator():
         accumulated_content = ""

@@ -547,6 +547,118 @@ class TestSendMessage:
         assert "{" not in complete_data["content"]
 
 
+class TestCheckpointRepairIntegration:
+    """Integration tests for self-healing corrupted checkpoints."""
+
+    async def test_recovers_after_orphaned_tool_call(
+        self, client: AsyncClient, session_id: str, conversation_id: str
+    ) -> None:
+        """Conversation with orphaned tool_calls recovers on next message."""
+        # Simulate a checkpoint left with an AIMessage that has tool_calls
+        # but no corresponding ToolMessages (as if a crash happened mid-tool)
+        ai_msg = MagicMock()
+        ai_msg.type = "ai"
+        ai_msg.content = ""
+        ai_msg.tool_calls = [
+            {"id": "call_abc", "name": "execute_query", "args": {"sql": "SELECT 1"}},
+        ]
+
+        human_msg = MagicMock()
+        human_msg.type = "human"
+        human_msg.content = "Show me data"
+
+        corrupted_state = MagicMock()
+        corrupted_state.values = {"messages": [human_msg, ai_msg]}
+
+        # Track whether aupdate_state was called with the repair
+        repair_called = False
+        repair_messages = []
+
+        async def mock_aupdate_state(config, values, as_node=None):
+            nonlocal repair_called, repair_messages
+            repair_called = True
+            repair_messages = values.get("messages", [])
+
+        # After repair, streaming works normally
+        async def mock_astream_events(input_data, config, version):
+            yield {
+                "event": "on_chat_model_stream",
+                "data": {"chunk": MagicMock(content="Recovered!")},
+            }
+
+        mock_graph = MagicMock()
+        mock_graph.aget_state = AsyncMock(return_value=corrupted_state)
+        mock_graph.aupdate_state = mock_aupdate_state
+        mock_graph.astream_events = mock_astream_events
+
+        app = client._transport.app  # type: ignore[attr-defined]
+        app.state.agent_graph = mock_graph
+
+        resp = await client.post(
+            f"/api/conversations/{conversation_id}/messages",
+            json={"content": "Try again"},
+            cookies=_session_cookie(session_id),
+        )
+        assert resp.status_code == 200
+
+        # Verify repair was triggered
+        assert repair_called
+        assert len(repair_messages) == 1
+        assert repair_messages[0].tool_call_id == "call_abc"
+        assert "interrupted" in repair_messages[0].content.lower()
+
+        # Verify streaming still works after repair
+        events = _parse_sse(resp.text)
+        complete_events = [e for e in events if e["event"] == "message_complete"]
+        assert len(complete_events) == 1
+        assert json.loads(complete_events[0]["data"])["content"] == "Recovered!"
+
+    async def test_clean_checkpoint_not_modified(
+        self, client: AsyncClient, session_id: str, conversation_id: str
+    ) -> None:
+        """A clean checkpoint (no orphans) is not patched before streaming."""
+        human_msg = MagicMock()
+        human_msg.type = "human"
+        human_msg.content = "Hello"
+
+        ai_msg = MagicMock()
+        ai_msg.type = "ai"
+        ai_msg.content = "Hi there!"
+        ai_msg.tool_calls = []
+
+        clean_state = MagicMock()
+        clean_state.values = {"messages": [human_msg, ai_msg]}
+
+        async def mock_astream_events(input_data, config, version):
+            yield {
+                "event": "on_chat_model_stream",
+                "data": {"chunk": MagicMock(content="Response")},
+            }
+
+        mock_graph = MagicMock()
+        mock_graph.aget_state = AsyncMock(return_value=clean_state)
+        mock_graph.aupdate_state = AsyncMock()
+        mock_graph.astream_events = mock_astream_events
+
+        app = client._transport.app  # type: ignore[attr-defined]
+        app.state.agent_graph = mock_graph
+
+        resp = await client.post(
+            f"/api/conversations/{conversation_id}/messages",
+            json={"content": "Hello again"},
+            cookies=_session_cookie(session_id),
+        )
+        assert resp.status_code == 200
+
+        # Repair should NOT have been called
+        mock_graph.aupdate_state.assert_not_called()
+
+        # Normal streaming still works
+        events = _parse_sse(resp.text)
+        complete_events = [e for e in events if e["event"] == "message_complete"]
+        assert len(complete_events) == 1
+
+
 def _parse_sse(text: str) -> list[dict[str, str]]:
     """Parse SSE text into a list of {event, data} dicts.
 
