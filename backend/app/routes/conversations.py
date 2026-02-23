@@ -233,7 +233,14 @@ async def send_message(
                     tool_name = event.get("name", "unknown")
                     # Capture present_results args from on_tool_start
                     if tool_name == "present_results":
-                        present_results_meta = event.get("data", {}).get("input", {})
+                        raw_input = event.get("data", {}).get("input", {})
+                        if isinstance(raw_input, str):
+                            try:
+                                raw_input = json.loads(raw_input)
+                            except (json.JSONDecodeError, ValueError):
+                                raw_input = {}
+                        if isinstance(raw_input, dict):
+                            present_results_meta = raw_input
                     # Capture SQL from execute_query tool start
                     elif tool_name == "execute_query":
                         tool_input = event.get("data", {}).get("input", {})
@@ -253,9 +260,18 @@ async def send_message(
                     tool_name = event.get("name", "unknown")
                     tool_output = event.get("data", {}).get("output", "")
                     # Capture execute_query data rows from on_tool_end
-                    if tool_name == "execute_query" and isinstance(tool_output, dict):
-                        if tool_output.get("success"):
-                            last_query_rows = tool_output.get("rows", [])
+                    # tool_output may be a ToolMessage, dict, or str
+                    if tool_name == "execute_query":
+                        raw = tool_output
+                        if hasattr(raw, "content"):
+                            raw = raw.content
+                        if isinstance(raw, str):
+                            try:
+                                raw = json.loads(raw)
+                            except (json.JSONDecodeError, ValueError):
+                                raw = None
+                        if isinstance(raw, dict) and raw.get("success"):
+                            last_query_rows = raw.get("rows", [])
                     summary = _summarize_tool_output(tool_output)
                     yield {
                         "event": "tool_end",
